@@ -77,15 +77,14 @@ export async function POST(req: NextRequest) {
     (requestIp !== null &&
       nearest!.office_ip!.split(',').map((ip) => ip.trim()).includes(requestIp))
 
-  const isSuccess = isWithinRadius && nearestIpOk
-
   // Xác thực khuôn mặt — trình duyệt đã tự trích embedding (128 số) ngay
   // trên thiết bị, server chỉ so sánh với embedding đã đăng ký của CHÍNH
   // nhân viên đang gọi API này (không nhận diện "đây là ai", chỉ trả lời
-  // "có đúng là người đã đăng ký user_id này không"). CHƯA bắt buộc vào
-  // is_success — chỉ ghi nhận, giống is_ip_verified lúc mới thêm.
+  // "có đúng là người đã đăng ký user_id này không"). Bắt buộc để tính
+  // is_success — chưa đăng ký khuôn mặt hoặc sai mặt đều coi là thất bại.
   let isFaceVerified = false
   let faceDistance: number | null = null
+  let hasEnrollment = false
   if (Array.isArray(faceEmbedding) && faceEmbedding.length === 128) {
     const { data: enrollment } = await supabase
       .from('hrm_face_enrollments')
@@ -93,10 +92,13 @@ export async function POST(req: NextRequest) {
       .eq('user_id', user!.id)
       .maybeSingle()
     if (enrollment) {
+      hasEnrollment = true
       faceDistance = euclideanDistance(faceEmbedding as number[], enrollment.embedding as number[])
       isFaceVerified = faceDistance <= FACE_MATCH_THRESHOLD
     }
   }
+
+  const isSuccess = isWithinRadius && nearestIpOk && isFaceVerified
 
   const { data: log, error: insertError } = await supabase
     .from('hrm_attendance_logs')
@@ -125,13 +127,11 @@ export async function POST(req: NextRequest) {
 
   let failReason: string | null = null
   if (!isSuccess) {
-    if (!isWithinRadius && !nearestIpOk) {
-      failReason = 'Ngoài khu vực GPS cho phép và sai mạng văn phòng'
-    } else if (!isWithinRadius) {
-      failReason = 'Ngoài khu vực GPS cho phép'
-    } else {
-      failReason = 'Sai mạng văn phòng (IP không khớp)'
-    }
+    const reasons: string[] = []
+    if (!isWithinRadius) reasons.push('ngoài khu vực GPS cho phép')
+    if (!nearestIpOk) reasons.push('sai mạng văn phòng')
+    if (!isFaceVerified) reasons.push(hasEnrollment ? 'khuôn mặt không khớp' : 'chưa đăng ký khuôn mặt')
+    failReason = reasons.length > 0 ? reasons.join(', ') : 'không đạt điều kiện'
   }
 
   return NextResponse.json({

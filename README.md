@@ -89,12 +89,11 @@ bên ngoài, không tốn phí theo lượt, không gửi ảnh lên server**:
 repo, đã copy sẵn vào `public/models/` trong repo này — không cần tải lại
 khi setup máy mới, chỉ cần `git clone` là có đủ).
 
-**Quan trọng — CHƯA bắt buộc để tính `is_success`**: giống cách `is_ip_verified`
-từng bắt đầu, khuôn mặt hiện chỉ được **ghi nhận**, chưa đưa vào điều kiện
-chấm công hợp lệ. Muốn bắt buộc khớp khuôn mặt mới tính thành công, sửa dòng
-`isSuccess` trong `src/app/api/attendance/check-in/route.ts` thêm điều kiện
-`isFaceVerified` — cần cân nhắc trước vì sẽ chặn cứng nhân viên chưa đăng ký
-khuôn mặt.
+**Bắt buộc để tính `is_success`**: `isSuccess = isWithinRadius && nearestIpOk && isFaceVerified`
+— nhân viên **chưa đăng ký khuôn mặt** hoặc **sai mặt** đều bị tính là chấm
+công thất bại (vẫn lưu log để quản lý xem lại, không chặn hẳn không cho gửi
+request). Nhân viên mới cần vào `/dang-ky-khuon-mat` đăng ký trước khi chấm
+công lần đầu.
 
 ## Giới hạn đã biết (chưa làm ở v1)
 
@@ -112,6 +111,6 @@ khuôn mặt.
   người khác qua API), nhưng không chặn tự chấm công nhiều lần liên tiếp.
 - `hrm_face_enrollments` cho phép nhân viên tự đăng ký lại bất kỳ lúc nào,
   không cần admin duyệt — nghĩa là 1 nhân viên có thể tự thay embedding tham
-  chiếu của chính mình. Đủ dùng cho mục đích hiện tại (chỉ ghi nhận, chưa
-  chặn cứng), nhưng nếu sau này bắt buộc khớp khuôn mặt mới cho chấm công,
-  nên cân nhắc thêm bước admin khoá lại sau lần đăng ký đầu.
+  chiếu của chính mình bất kỳ lúc nào (kể cả sau khi đã bắt buộc khớp mặt để
+  chấm công). Nên cân nhắc thêm bước admin khoá lại sau lần đăng ký đầu nếu
+  cần chặt hơn.
