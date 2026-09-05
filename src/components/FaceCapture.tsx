@@ -19,12 +19,17 @@ export function FaceCapture({ onCapture, onCancel, title = 'Đưa khuôn mặt v
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const stableCountRef = useRef(0)
-  const capturedRef = useRef(false)
+  const busyRef = useRef(false)
+  // 'error' ở đây CHỈ dùng cho lỗi camera/model không có đường lùi (không mở
+  // được camera) — thất bại khi trích đặc trưng chỉ là hint tạm thời, vòng
+  // quét vẫn tiếp tục chạy ngầm để tự thử lại, không được để chết hẳn.
   const [status, setStatus] = useState<'loading' | 'searching' | 'found' | 'processing' | 'error'>('loading')
   const [error, setError] = useState('')
+  const [hint, setHint] = useState('')
 
   useEffect(() => {
     let pollTimer: ReturnType<typeof setInterval> | null = null
+    let hintTimer: ReturnType<typeof setTimeout> | null = null
     let cancelled = false
 
     async function init() {
@@ -43,22 +48,29 @@ export function FaceCapture({ onCapture, onCancel, title = 'Đưa khuôn mặt v
         setStatus('searching')
 
         pollTimer = setInterval(async () => {
-          if (capturedRef.current || !videoRef.current) return
+          if (busyRef.current || !videoRef.current) return
           const found = await quickDetectFace(videoRef.current)
+          if (cancelled) return
           if (found) {
             stableCountRef.current += 1
             setStatus('found')
             if (stableCountRef.current >= STABLE_DETECTIONS_REQUIRED) {
-              capturedRef.current = true
-              if (pollTimer) clearInterval(pollTimer)
+              busyRef.current = true
               setStatus('processing')
               const embedding = videoRef.current ? await extractFaceEmbedding(videoRef.current) : null
+              if (cancelled) return
               if (embedding) {
+                if (pollTimer) clearInterval(pollTimer)
                 onCapture(embedding)
               } else {
-                setError('Không trích được đặc trưng khuôn mặt, thử lại nhé')
-                setStatus('error')
-                capturedRef.current = false
+                // Thất bại thì quay lại tìm mặt tiếp, KHÔNG dừng vòng quét —
+                // trước đây dừng hẳn ở đây khiến cả camera bị "đứng hình".
+                setHint('Không trích được đặc trưng khuôn mặt, đang thử lại...')
+                setStatus('searching')
+                stableCountRef.current = 0
+                busyRef.current = false
+                if (hintTimer) clearTimeout(hintTimer)
+                hintTimer = setTimeout(() => setHint(''), 2500)
               }
             }
           } else {
@@ -77,9 +89,11 @@ export function FaceCapture({ onCapture, onCancel, title = 'Đưa khuôn mặt v
     return () => {
       cancelled = true
       if (pollTimer) clearInterval(pollTimer)
+      if (hintTimer) clearTimeout(hintTimer)
       streamRef.current?.getTracks().forEach((t) => t.stop())
     }
-  }, [onCapture])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function handleCancel() {
     streamRef.current?.getTracks().forEach((t) => t.stop())
@@ -91,7 +105,7 @@ export function FaceCapture({ onCapture, onCancel, title = 'Đưa khuôn mặt v
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold text-gray-800">{title}</h2>
-          <button onClick={handleCancel} className="text-gray-400 hover:text-gray-600">
+          <button type="button" onClick={handleCancel} className="text-gray-400 hover:text-gray-600 p-1">
             <X size={18} />
           </button>
         </div>
@@ -107,7 +121,7 @@ export function FaceCapture({ onCapture, onCancel, title = 'Đưa khuôn mặt v
           )}
         </div>
 
-        <div className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-600">
+        <div className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-600 min-h-[20px]">
           {status === 'loading' && (
             <>
               <Loader2 size={15} className="animate-spin" /> Đang tải model nhận diện...
@@ -115,7 +129,7 @@ export function FaceCapture({ onCapture, onCancel, title = 'Đưa khuôn mặt v
           )}
           {status === 'searching' && (
             <>
-              <ScanFace size={15} /> Đang tìm khuôn mặt...
+              <ScanFace size={15} /> {hint || 'Đang tìm khuôn mặt...'}
             </>
           )}
           {status === 'found' && (
@@ -130,6 +144,16 @@ export function FaceCapture({ onCapture, onCancel, title = 'Đưa khuôn mặt v
           )}
           {status === 'error' && <span className="text-red-500">{error}</span>}
         </div>
+
+        {status === 'error' && (
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="mt-3 w-full rounded-xl border border-gray-200 py-2 text-sm text-gray-600 hover:bg-gray-50"
+          >
+            Đóng
+          </button>
+        )}
       </div>
     </div>
   )

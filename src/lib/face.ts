@@ -38,9 +38,12 @@ export async function extractFaceEmbedding(input: HTMLVideoElement): Promise<num
   return result ? Array.from(result.descriptor) : null
 }
 
-/** Khoảng cách Euclid giữa 2 embedding — ngưỡng chuẩn của face-api.js là
- * 0.6 (nhỏ hơn = cùng người, dùng cho model face_recognition_model gốc). */
-export const FACE_MATCH_THRESHOLD = 0.6
+/** Khoảng cách Euclid giữa 2 embedding — nhỏ hơn ngưỡng = cùng người.
+ * 0.6 là ngưỡng mặc định face-api.js khuyến nghị; chỉnh xuống 0.3 theo yêu
+ * cầu thực tế — CHẶT hơn hẳn mặc định, giảm rủi ro nhận nhầm người khác
+ * nhưng đổi lại dễ từ chối nhầm chính chủ khi ảnh sáng/góc mặt kém, nên
+ * theo dõi tỷ lệ "thất bại vì sai mặt" ở báo cáo sau khi đổi ngưỡng này. */
+export const FACE_MATCH_THRESHOLD = 0.3
 
 export function euclideanDistance(a: number[], b: number[]): number {
   if (a.length !== b.length) return Infinity

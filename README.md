@@ -81,9 +81,11 @@ bên ngoài, không tốn phí theo lượt, không gửi ảnh lên server**:
    lưu trong bảng `hrm_face_enrollments`.
 2. Mỗi lần chấm công ở `/`, ngay sau khi lấy GPS, trình duyệt tự mở camera,
    trích embedding mới, gửi kèm request `/api/attendance/check-in`.
-3. Server so khoảng cách Euclid giữa 2 embedding (ngưỡng chuẩn `0.6` của
-   `face-api.js`) — khớp thì `is_face_verified = true`, ghi cả khoảng cách
-   (`face_distance`) để tiện audit.
+3. Server so khoảng cách Euclid giữa 2 embedding (ngưỡng `0.3` — **chặt hơn**
+   mức mặc định `0.6` face-api.js khuyến nghị, đổi theo yêu cầu thực tế; xem
+   comment tại `FACE_MATCH_THRESHOLD` trong `src/lib/face.ts` về đánh đổi) —
+   khớp thì `is_face_verified = true`, ghi cả khoảng cách (`face_distance`)
+   để tiện audit.
 
 **Model weights** (~7MB, tải 1 lần từ `justadudewhohacks/face-api.js` GitHub
 repo, đã copy sẵn vào `public/models/` trong repo này — không cần tải lại
