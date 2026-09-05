@@ -48,11 +48,7 @@ export default function DangKyKhuonMatPage() {
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-50">
           <ScanFace size={26} className="text-brand-500" />
         </div>
-        <h1 className="text-lg font-bold text-gray-800 mb-1">Đăng ký khuôn mặt</h1>
-        <p className="text-sm text-gray-500 mb-6">
-          Dùng để xác thực đúng người mỗi lần chấm công. Xử lý hoàn toàn trên thiết bị của bạn — không gửi ảnh lên
-          server, chỉ gửi 1 dãy số đặc trưng khuôn mặt.
-        </p>
+        <h1 className="text-lg font-bold text-gray-800 mb-6">Đăng ký khuôn mặt</h1>
 
         {enrolled && (
           <div className="mb-4 flex items-center justify-center gap-2 text-sm text-green-700 bg-green-50 rounded-xl p-3">
