@@ -14,6 +14,7 @@ type AttendanceLog = {
   is_face_verified: boolean
   is_success: boolean
   distance_m: number | null
+  face_distance: number | null
   hrm_work_locations: { name: string } | null
 }
 
@@ -292,12 +293,23 @@ export default function ChamCongPage() {
                     <LogOut size={14} className="text-accent-500" />
                   )}
                   {log.type === 'check_in' ? 'Vào' : 'Ra'}
-                  {log.is_success ? (
-                    <>
-                      {log.is_ip_verified && <Wifi size={12} className="text-brand-400" />}
-                      {log.is_face_verified && <ScanFace size={12} className="text-brand-400" />}
-                    </>
-                  ) : (
+                  <span
+                    className={`flex items-center gap-0.5 text-xs ${
+                      log.is_within_radius ? 'text-green-600' : 'text-red-500'
+                    }`}
+                  >
+                    <Wifi size={12} />
+                    {log.distance_m != null ? `${Math.round(log.distance_m)}m` : '—'}
+                  </span>
+                  <span
+                    className={`flex items-center gap-0.5 text-xs ${
+                      log.is_face_verified ? 'text-green-600' : 'text-red-500'
+                    }`}
+                  >
+                    <ScanFace size={12} />
+                    {log.face_distance != null ? log.face_distance.toFixed(2) : '—'}
+                  </span>
+                  {!log.is_success && (
                     <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">thất bại</span>
                   )}
                 </span>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, LogIn, LogOut, AlertTriangle, Wifi, Send, Globe, ScanFace } from 'lucide-react'
+import { Loader2, LogIn, LogOut, Wifi, Send, Globe, ScanFace, MapPin } from 'lucide-react'
 import { useAuth } from '@/contexts/auth'
 
 type AttendanceRow = {
@@ -37,102 +37,77 @@ export default function BaoCaoPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-2xl mx-auto px-4 py-8">
       <h1 className="text-lg font-bold text-gray-800 mb-4">Báo cáo chấm công (500 dòng gần nhất)</h1>
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="p-5 text-sm text-gray-400 flex items-center gap-2">
-            <Loader2 size={14} className="animate-spin" /> Đang tải...
-          </div>
-        ) : rows.length === 0 ? (
-          <div className="p-5 text-sm text-gray-400">Chưa có dữ liệu chấm công.</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-              <tr>
-                <th className="text-left px-4 py-2 font-semibold">Nhân viên</th>
-                <th className="text-left px-4 py-2 font-semibold">Kết quả</th>
-                <th className="text-left px-4 py-2 font-semibold">Loại</th>
-                <th className="text-left px-4 py-2 font-semibold">Thời gian</th>
-                <th className="text-left px-4 py-2 font-semibold">Địa điểm gần nhất</th>
-                <th className="text-left px-4 py-2 font-semibold">Khoảng cách</th>
-                <th className="text-left px-4 py-2 font-semibold">IP văn phòng</th>
-                <th className="text-left px-4 py-2 font-semibold">Khuôn mặt</th>
-                <th className="text-left px-4 py-2 font-semibold">Kênh</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {rows.map((row) => (
-                <tr key={row.id}>
-                  <td className="px-4 py-2.5">
-                    <div className="font-medium text-gray-800">{row.users?.full_name ?? '—'}</div>
-                    <div className="text-xs text-gray-400">{row.users?.email}</div>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    {row.is_success ? (
-                      <span className="text-xs font-semibold text-green-700 bg-green-50 px-2 py-1 rounded-full">
-                        Thành công
-                      </span>
-                    ) : (
-                      <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded-full">
-                        Thất bại
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <span className="flex items-center gap-1.5">
-                      {row.type === 'check_in' ? (
-                        <LogIn size={13} className="text-brand-500" />
-                      ) : (
-                        <LogOut size={13} className="text-accent-500" />
-                      )}
-                      {row.type === 'check_in' ? 'Vào' : 'Ra'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-gray-600">
-                    {new Date(row.created_at).toLocaleString('vi-VN')}
-                  </td>
-                  <td className="px-4 py-2.5 text-gray-600">{row.hrm_work_locations?.name ?? '—'}</td>
-                  <td className="px-4 py-2.5">
-                    <span className={`flex items-center gap-1 ${row.is_within_radius ? 'text-gray-600' : 'text-amber-600'}`}>
-                      {!row.is_within_radius && <AlertTriangle size={13} />}
-                      {row.distance_m != null ? `${Math.round(row.distance_m)}m` : '—'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    {row.is_ip_verified ? (
-                      <span className="flex items-center gap-1 text-brand-600">
-                        <Wifi size={13} />
-                        Đúng
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    {row.is_face_verified ? (
-                      <span className="flex items-center gap-1 text-brand-600">
-                        <ScanFace size={13} />
-                        Khớp{row.face_distance != null ? ` (${row.face_distance.toFixed(2)})` : ''}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">
-                        —{row.face_distance != null ? ` (${row.face_distance.toFixed(2)})` : ''}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <span className="flex items-center gap-1 text-gray-500">
-                      {row.channel === 'telegram' ? <Send size={13} /> : <Globe size={13} />}
-                      {row.channel === 'telegram' ? 'Telegram' : 'Web'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+
+      {loading ? (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 text-sm text-gray-400 flex items-center gap-2">
+          <Loader2 size={14} className="animate-spin" /> Đang tải...
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 text-sm text-gray-400">
+          Chưa có dữ liệu chấm công.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((row) => (
+            <div key={row.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-800 truncate">{row.users?.full_name ?? '—'}</p>
+                  <p className="text-xs text-gray-400 truncate">{row.users?.email}</p>
+                </div>
+                {row.is_success ? (
+                  <span className="shrink-0 text-xs font-semibold text-green-700 bg-green-50 px-2 py-1 rounded-full">
+                    Thành công
+                  </span>
+                ) : (
+                  <span className="shrink-0 text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded-full">
+                    Thất bại
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-3 flex items-center justify-between text-sm">
+                <span className="flex items-center gap-1.5 font-medium text-gray-700">
+                  {row.type === 'check_in' ? (
+                    <LogIn size={14} className="text-brand-500" />
+                  ) : (
+                    <LogOut size={14} className="text-accent-500" />
+                  )}
+                  {row.type === 'check_in' ? 'Vào' : 'Ra'}
+                </span>
+                <span className="text-gray-500">{new Date(row.created_at).toLocaleString('vi-VN')}</span>
+              </div>
+
+              <p className="mt-1 text-sm text-gray-600">{row.hrm_work_locations?.name ?? 'Chưa có địa điểm'}</p>
+
+              <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-3 text-xs">
+                <span
+                  className={`flex items-center gap-1 ${row.is_within_radius ? 'text-green-600' : 'text-red-500'}`}
+                >
+                  <MapPin size={13} />
+                  {row.distance_m != null ? `${Math.round(row.distance_m)}m` : '—'}
+                </span>
+                <span className={`flex items-center gap-1 ${row.is_ip_verified ? 'text-green-600' : 'text-red-500'}`}>
+                  <Wifi size={13} />
+                  {row.is_ip_verified ? 'Đúng mạng' : 'Sai mạng'}
+                </span>
+                <span
+                  className={`flex items-center gap-1 ${row.is_face_verified ? 'text-green-600' : 'text-red-500'}`}
+                >
+                  <ScanFace size={13} />
+                  {row.face_distance != null ? row.face_distance.toFixed(2) : '—'}
+                </span>
+                <span className="ml-auto flex items-center gap-1 text-gray-400">
+                  {row.channel === 'telegram' ? <Send size={13} /> : <Globe size={13} />}
+                  {row.channel === 'telegram' ? 'Telegram' : 'Web'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
