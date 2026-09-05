@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, MapPin, ScanFace, Wifi } from 'lucide-react'
+import { ChevronDown, ChevronUp, Loader2, MapPin, ScanFace, Wifi } from 'lucide-react'
 import { useAuth } from '@/contexts/auth'
 
 type Employee = {
@@ -16,12 +16,19 @@ type Employee = {
 
 type Location = { id: string; name: string }
 
+type FaceEnrollment =
+  | { id: string; enrolled: false }
+  | { id: string; enrolled: true; enrolledAt: string; embeddings: number[][]; imageUrls: string[] }
+
 export default function YeuCauChamCongPage() {
   const { user, loading: authLoading } = useAuth()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [faceData, setFaceData] = useState<Map<string, FaceEnrollment>>(new Map())
+  const [expandedFaceId, setExpandedFaceId] = useState<string | null>(null)
+  const [expandedVectorId, setExpandedVectorId] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -34,8 +41,17 @@ export default function YeuCauChamCongPage() {
     setLoading(false)
   }
 
+  async function loadFaceData() {
+    const res = await fetch('/api/admin/face-enrollments')
+    if (res.ok) {
+      const data = await res.json()
+      setFaceData(new Map((data.employees as FaceEnrollment[]).map((e) => [e.id, e])))
+    }
+  }
+
   useEffect(() => {
     load()
+    loadFaceData()
   }, [])
 
   async function saveField(emp: Employee, patch: Partial<Employee>) {
@@ -127,6 +143,70 @@ export default function YeuCauChamCongPage() {
                   </option>
                 ))}
               </select>
+
+              {(() => {
+                const face = faceData.get(emp.id)
+                if (!face) return null
+                const isFaceOpen = expandedFaceId === emp.id
+                return (
+                  <div className="mt-3 border-t border-gray-100 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedFaceId(isFaceOpen ? null : emp.id)}
+                      className="flex w-full items-center justify-between text-sm text-gray-600"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <ScanFace size={14} className="text-brand-500" />
+                        Dữ liệu khuôn mặt —{' '}
+                        {face.enrolled ? (
+                          <span className="text-green-600">đã đăng ký ({face.embeddings.length} mẫu)</span>
+                        ) : (
+                          <span className="text-gray-400">chưa đăng ký</span>
+                        )}
+                      </span>
+                      {face.enrolled && (isFaceOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                    </button>
+
+                    {isFaceOpen && face.enrolled && (
+                      <div className="mt-3 space-y-3">
+                        <p className="text-xs text-gray-400">
+                          Đăng ký lúc {new Date(face.enrolledAt).toLocaleString('vi-VN')}
+                        </p>
+
+                        <div className="flex flex-wrap gap-2">
+                          {face.imageUrls.map((url, i) => (
+                            // eslint-disable-next-line @next/next/no-img-element -- ảnh signed URL riêng tư, không dùng next/image tối ưu qua CDN công khai
+                            <img
+                              key={i}
+                              src={url}
+                              alt={`Mẫu ${i + 1}`}
+                              className="h-16 w-16 rounded-lg object-cover border border-gray-200"
+                            />
+                          ))}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setExpandedVectorId(expandedVectorId === emp.id ? null : emp.id)}
+                          className="text-xs text-brand-600 hover:underline"
+                        >
+                          {expandedVectorId === emp.id ? 'Ẩn vector' : 'Xem vector'}
+                        </button>
+
+                        {expandedVectorId === emp.id && (
+                          <pre className="max-h-40 overflow-auto rounded-lg bg-gray-50 p-2 text-[10px] leading-tight text-gray-500">
+                            {JSON.stringify(
+                              face.embeddings.map((v) => v.map((n) => Number(n.toFixed(3)))),
+                              null,
+                              1,
+                            )}
+                          </pre>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           ))}
         </div>

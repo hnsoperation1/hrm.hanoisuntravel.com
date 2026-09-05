@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { ScanFace, CheckCircle2, Loader2 } from 'lucide-react'
-import { FaceCapture } from '@/components/FaceCapture'
+import { FaceCapture, type FaceSample } from '@/components/FaceCapture'
 
 export default function DangKyKhuonMatPage() {
   const [enrolled, setEnrolled] = useState<boolean | null>(null)
@@ -24,14 +24,17 @@ export default function DangKyKhuonMatPage() {
 
   useEffect(loadStatus, [])
 
-  async function handleCapture(embedding: number[]) {
+  async function handleCapture(samples: FaceSample[]) {
     setCapturing(false)
     setSaving(true)
     setError('')
     const res = await fetch('/api/face/enroll', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ embedding }),
+      body: JSON.stringify({
+        embeddings: samples.map((s) => s.embedding),
+        images: samples.map((s) => s.image),
+      }),
     })
     setSaving(false)
     if (!res.ok) {
@@ -69,7 +72,14 @@ export default function DangKyKhuonMatPage() {
         {error && <p className="mt-3 text-xs text-red-500">{error}</p>}
       </div>
 
-      {capturing && <FaceCapture onCapture={handleCapture} onCancel={() => setCapturing(false)} />}
+      {capturing && (
+        <FaceCapture
+          onCapture={handleCapture}
+          onCancel={() => setCapturing(false)}
+          sampleCount={5}
+          title="Chụp 5 ảnh để đăng ký"
+        />
+      )}
     </div>
   )
 }

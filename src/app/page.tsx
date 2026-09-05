@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { CheckCircle2, XCircle, Loader2, LogIn, LogOut, Wifi, ScanFace, CalendarCheck, Trash2 } from 'lucide-react'
-import { FaceCapture } from '@/components/FaceCapture'
+import { FaceCapture, type FaceSample } from '@/components/FaceCapture'
 import { useAuth } from '@/contexts/auth'
 
 type AttendanceLog = {
@@ -159,7 +159,7 @@ export default function ChamCongPage() {
     }
   }
 
-  async function submitCheckIn(faceEmbedding: number[]) {
+  async function submitCheckIn(faceSamples: FaceSample[]) {
     setShowFaceCapture(false)
     if (!status || !pendingPosition) {
       setSubmitting(false)
@@ -176,7 +176,10 @@ export default function ChamCongPage() {
           lng: pendingPosition.coords.longitude,
           accuracy: pendingPosition.coords.accuracy,
           type: submittedType,
-          faceEmbedding,
+          // Chấm công chỉ chụp 1 ảnh (FaceCapture mặc định sampleCount=1) —
+          // lấy phần tử đầu tiên, khác lúc đăng ký chụp nhiều ảnh mẫu. Ảnh
+          // snapshot đi kèm không cần gửi lên đây, chỉ dùng lúc đăng ký.
+          faceEmbedding: faceSamples[0]?.embedding,
         }),
       })
       const data = await res.json()

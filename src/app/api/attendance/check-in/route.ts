@@ -66,22 +66,27 @@ export async function POST(req: NextRequest) {
   )
 
   // Xác thực khuôn mặt — trình duyệt đã tự trích embedding (128 số) ngay
-  // trên thiết bị, server chỉ so sánh với embedding đã đăng ký của CHÍNH
-  // nhân viên đang gọi API này (không nhận diện "đây là ai", chỉ trả lời
-  // "có đúng là người đã đăng ký user_id này không"). Bắt buộc để tính
+  // trên thiết bị, server chỉ so sánh với các embedding mẫu đã đăng ký của
+  // CHÍNH nhân viên đang gọi API này (không nhận diện "đây là ai", chỉ trả
+  // lời "có đúng là người đã đăng ký user_id này không"). Bắt buộc để tính
   // is_success — chưa đăng ký khuôn mặt hoặc sai mặt đều coi là thất bại.
+  // So với TẤT CẢ mẫu đã đăng ký (thường ~5 ảnh), lấy khoảng cách NHỎ NHẤT —
+  // mỗi mẫu chụp góc/ánh sáng hơi khác nhau nên khớp tốt hơn chỉ 1 mẫu.
   let isFaceVerified = false
   let faceDistance: number | null = null
   let hasEnrollment = false
   if (Array.isArray(faceEmbedding) && faceEmbedding.length === 128) {
     const { data: enrollment } = await supabase
       .from('hrm_face_enrollments')
-      .select('embedding')
+      .select('embeddings')
       .eq('user_id', user!.id)
       .maybeSingle()
-    if (enrollment) {
+    if (enrollment && Array.isArray(enrollment.embeddings) && enrollment.embeddings.length > 0) {
       hasEnrollment = true
-      faceDistance = euclideanDistance(faceEmbedding as number[], enrollment.embedding as number[])
+      const distances = (enrollment.embeddings as number[][]).map((sample) =>
+        euclideanDistance(faceEmbedding as number[], sample),
+      )
+      faceDistance = Math.min(...distances)
       isFaceVerified = faceDistance <= FACE_MATCH_THRESHOLD
     }
   }

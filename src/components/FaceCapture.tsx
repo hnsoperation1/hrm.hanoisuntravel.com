@@ -8,28 +8,66 @@ import { loadFaceModels, quickDetectFace, extractFaceEmbedding } from '@/lib/fac
 // khuôn mặt mới thoáng qua khung hình (rung tay, đưa điện thoại lên).
 const STABLE_DETECTIONS_REQUIRED = 3
 const POLL_INTERVAL_MS = 350
+// Nghỉ 1 nhịp giữa các mẫu khi chụp nhiều ảnh (đăng ký) — vừa để nhân viên
+// kịp hơi đổi góc mặt/biểu cảm giữa các lần chụp (đa dạng mẫu hơn là chụp
+// liên tiếp cùng 1 khung hình gần như y hệt), vừa tránh chụp dính liền nhau.
+const PAUSE_BETWEEN_SAMPLES_MS = 700
+
+/** 1 mẫu chụp = 1 embedding (để so khớp) + 1 ảnh JPEG dạng dataURL (để admin
+ * xem lại bằng mắt, xác minh nhân viên đăng ký đúng khuôn mặt của mình). */
+export type FaceSample = { embedding: number[]; image: string }
 
 type Props = {
-  onCapture: (embedding: number[]) => void
+  /** Nhận đủ số mẫu yêu cầu — luôn là mảng, kể cả khi sampleCount = 1. */
+  onCapture: (samples: FaceSample[]) => void
   onCancel: () => void
   title?: string
+  /** Số ảnh mẫu cần chụp — mặc định 1 (dùng lúc chấm công). Đăng ký khuôn
+   * mặt nên truyền số lớn hơn (vd 5) để tăng độ chính xác so khớp sau này. */
+  sampleCount?: number
 }
 
-export function FaceCapture({ onCapture, onCancel, title = 'Đưa khuôn mặt vào khung hình' }: Props) {
+/** Chụp lại khung hình hiện tại thành ảnh vuông JPEG nhỏ gọn (đủ để admin
+ * xem lại, không cần giữ nguyên độ phân giải camera gốc). Lật ngang cho khớp
+ * chiều hiển thị gương (-scale-x-100) mà nhân viên nhìn thấy lúc chụp. */
+function captureSnapshot(video: HTMLVideoElement): string {
+  const size = 240
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  ctx.translate(size, 0)
+  ctx.scale(-1, 1)
+  const vw = video.videoWidth
+  const vh = video.videoHeight
+  const side = Math.min(vw, vh)
+  ctx.drawImage(video, (vw - side) / 2, (vh - side) / 2, side, side, 0, 0, size, size)
+  return canvas.toDataURL('image/jpeg', 0.8)
+}
+
+export function FaceCapture({
+  onCapture,
+  onCancel,
+  title = 'Đưa khuôn mặt vào khung hình',
+  sampleCount = 1,
+}: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const stableCountRef = useRef(0)
   const busyRef = useRef(false)
+  const samplesRef = useRef<FaceSample[]>([])
   // 'error' ở đây CHỈ dùng cho lỗi camera/model không có đường lùi (không mở
   // được camera) — thất bại khi trích đặc trưng chỉ là hint tạm thời, vòng
   // quét vẫn tiếp tục chạy ngầm để tự thử lại, không được để chết hẳn.
   const [status, setStatus] = useState<'loading' | 'searching' | 'found' | 'processing' | 'error'>('loading')
   const [error, setError] = useState('')
   const [hint, setHint] = useState('')
+  const [captured, setCaptured] = useState(0)
 
   useEffect(() => {
     let pollTimer: ReturnType<typeof setInterval> | null = null
     let hintTimer: ReturnType<typeof setTimeout> | null = null
+    let pauseTimer: ReturnType<typeof setTimeout> | null = null
     let cancelled = false
 
     async function init() {
@@ -60,8 +98,21 @@ export function FaceCapture({ onCapture, onCancel, title = 'Đưa khuôn mặt v
               const embedding = videoRef.current ? await extractFaceEmbedding(videoRef.current) : null
               if (cancelled) return
               if (embedding) {
-                if (pollTimer) clearInterval(pollTimer)
-                onCapture(embedding)
+                const image = captureSnapshot(videoRef.current!)
+                samplesRef.current.push({ embedding, image })
+                setCaptured(samplesRef.current.length)
+                if (samplesRef.current.length >= sampleCount) {
+                  if (pollTimer) clearInterval(pollTimer)
+                  onCapture(samplesRef.current)
+                } else {
+                  // Còn thiếu mẫu — nghỉ 1 nhịp rồi quét tiếp cho mẫu kế tiếp.
+                  stableCountRef.current = 0
+                  setStatus('searching')
+                  setHint(`Đã chụp ${samplesRef.current.length}/${sampleCount} — giữ nguyên, chụp tiếp...`)
+                  pauseTimer = setTimeout(() => {
+                    busyRef.current = false
+                  }, PAUSE_BETWEEN_SAMPLES_MS)
+                }
               } else {
                 // Thất bại thì quay lại tìm mặt tiếp, KHÔNG dừng vòng quét —
                 // trước đây dừng hẳn ở đây khiến cả camera bị "đứng hình".
@@ -90,6 +141,7 @@ export function FaceCapture({ onCapture, onCancel, title = 'Đưa khuôn mặt v
       cancelled = true
       if (pollTimer) clearInterval(pollTimer)
       if (hintTimer) clearTimeout(hintTimer)
+      if (pauseTimer) clearTimeout(pauseTimer)
       streamRef.current?.getTracks().forEach((t) => t.stop())
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -104,7 +156,14 @@ export function FaceCapture({ onCapture, onCancel, title = 'Đưa khuôn mặt v
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-gray-800">{title}</h2>
+          <h2 className="text-sm font-bold text-gray-800">
+            {title}
+            {sampleCount > 1 && (
+              <span className="ml-1.5 font-normal text-gray-400">
+                ({captured}/{sampleCount})
+              </span>
+            )}
+          </h2>
           <button type="button" onClick={handleCancel} className="text-gray-400 hover:text-gray-600 p-1">
             <X size={18} />
           </button>
