@@ -7,7 +7,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (unauthorized) return unauthorized
 
   const body = await req.json().catch(() => null)
-  const { name, address, lat, lng, radius_m, is_active } = body ?? {}
+  const { name, address, lat, lng, radius_m, office_ip, is_active } = body ?? {}
 
   const update: Record<string, unknown> = {}
   if (typeof name === 'string') update.name = name.trim()
@@ -15,6 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (typeof lat === 'number' && !Number.isNaN(lat)) update.lat = lat
   if (typeof lng === 'number' && !Number.isNaN(lng)) update.lng = lng
   if (typeof radius_m === 'number' && radius_m > 0) update.radius_m = radius_m
+  if (typeof office_ip === 'string') update.office_ip = office_ip.trim() || null
   if (typeof is_active === 'boolean') update.is_active = is_active
 
   if (Object.keys(update).length === 0) {

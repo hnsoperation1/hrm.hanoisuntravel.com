@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, LogIn, LogOut, AlertTriangle } from 'lucide-react'
+import { Loader2, LogIn, LogOut, AlertTriangle, Wifi } from 'lucide-react'
 import { useAuth } from '@/contexts/auth'
 
 type AttendanceRow = {
@@ -10,6 +10,7 @@ type AttendanceRow = {
   created_at: string
   distance_m: number | null
   is_within_radius: boolean
+  is_ip_verified: boolean
   hrm_work_locations: { name: string } | null
   users: { full_name: string; email: string } | null
 }
@@ -50,6 +51,7 @@ export default function BaoCaoPage() {
                 <th className="text-left px-4 py-2 font-semibold">Thời gian</th>
                 <th className="text-left px-4 py-2 font-semibold">Địa điểm gần nhất</th>
                 <th className="text-left px-4 py-2 font-semibold">Khoảng cách</th>
+                <th className="text-left px-4 py-2 font-semibold">IP văn phòng</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -78,6 +80,16 @@ export default function BaoCaoPage() {
                       {!row.is_within_radius && <AlertTriangle size={13} />}
                       {row.distance_m != null ? `${Math.round(row.distance_m)}m` : '—'}
                     </span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {row.is_ip_verified ? (
+                      <span className="flex items-center gap-1 text-brand-600">
+                        <Wifi size={13} />
+                        Đúng
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
                   </td>
                 </tr>
               ))}

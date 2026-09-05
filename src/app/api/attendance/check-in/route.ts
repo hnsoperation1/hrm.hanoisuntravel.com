@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/lib/auth'
-import { haversineDistanceMeters } from '@/lib/geo'
+import { getClientIp, haversineDistanceMeters } from '@/lib/geo'
 
 type Body = {
   lat?: unknown
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
   const { data: locations, error: locError } = await supabase
     .from('hrm_work_locations')
-    .select('id, name, lat, lng, radius_m')
+    .select('id, name, lat, lng, radius_m, office_ip')
     .eq('is_active', true)
 
   if (locError) {
@@ -45,6 +45,25 @@ export async function POST(req: NextRequest) {
 
   const isWithinRadius = nearest ? nearest.distance <= nearest.radius_m : false
 
+  // Check IP văn phòng — lớp bổ sung độc lập với GPS, không thay thế. So
+  // khớp IP request hiện tại với danh sách IP đã khai cho BẤT KỲ địa điểm
+  // nào (không chỉ địa điểm gần nhất theo GPS), vì 1 văn phòng có thể có
+  // nhiều nhân viên ở xa toạ độ chính xác (GPS lệch trong nhà) nhưng vẫn
+  // đang dùng đúng mạng văn phòng.
+  const requestIp = getClientIp(req.headers)
+  let ipMatchedLocationName: string | null = null
+  if (requestIp) {
+    for (const loc of locations ?? []) {
+      if (!loc.office_ip) continue
+      const validIps = loc.office_ip.split(',').map((ip: string) => ip.trim())
+      if (validIps.includes(requestIp)) {
+        ipMatchedLocationName = loc.name
+        break
+      }
+    }
+  }
+  const isIpVerified = ipMatchedLocationName !== null
+
   const { data: log, error: insertError } = await supabase
     .from('hrm_attendance_logs')
     .insert({
@@ -56,6 +75,8 @@ export async function POST(req: NextRequest) {
       nearest_location_id: nearest?.id ?? null,
       distance_m: nearest?.distance ?? null,
       is_within_radius: isWithinRadius,
+      request_ip: requestIp,
+      is_ip_verified: isIpVerified,
     })
     .select('id, type, created_at')
     .single()
@@ -70,5 +91,7 @@ export async function POST(req: NextRequest) {
     distanceM: nearest ? Math.round(nearest.distance) : null,
     radiusM: nearest?.radius_m ?? null,
     isWithinRadius,
+    isIpVerified,
+    ipMatchedLocationName,
   })
 }

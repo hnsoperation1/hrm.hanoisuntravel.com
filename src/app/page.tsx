@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { CheckCircle2, XCircle, Loader2, MapPin, LogIn, LogOut } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, MapPin, LogIn, LogOut, Wifi } from 'lucide-react'
 
 type AttendanceLog = {
   id: string
@@ -22,6 +22,8 @@ type CheckInResult = {
   distanceM: number | null
   radiusM: number | null
   isWithinRadius: boolean
+  isIpVerified: boolean
+  ipMatchedLocationName: string | null
 }
 
 function formatTime(iso: string) {
@@ -155,6 +157,13 @@ export default function ChamCongPage() {
                   }`
                 : 'Chưa có địa điểm hợp lệ nào được cấu hình — đã ghi nhận vị trí'}
             </span>
+          </div>
+        )}
+
+        {lastResult?.isIpVerified && (
+          <div className="mt-2 flex items-center gap-2 text-left text-xs text-brand-600 bg-brand-50 rounded-xl p-2.5">
+            <Wifi size={13} className="shrink-0" />
+            <span>Đúng mạng "{lastResult.ipMatchedLocationName}"</span>
           </div>
         )}
       </div>

@@ -7,7 +7,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('hrm_work_locations')
-    .select('id, name, address, lat, lng, radius_m, is_active, created_at')
+    .select('id, name, address, lat, lng, radius_m, office_ip, is_active, created_at')
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: 'Không tải được danh sách địa điểm' }, { status: 500 })
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   if (unauthorized) return unauthorized
 
   const body = await req.json().catch(() => null)
-  const { name, address, lat, lng, radius_m } = body ?? {}
+  const { name, address, lat, lng, radius_m, office_ip } = body ?? {}
 
   if (
     typeof name !== 'string' ||
@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
       lat,
       lng,
       radius_m: typeof radius_m === 'number' && radius_m > 0 ? radius_m : 150,
+      office_ip: typeof office_ip === 'string' && office_ip.trim() ? office_ip.trim() : null,
       created_by: user!.id,
     })
     .select()

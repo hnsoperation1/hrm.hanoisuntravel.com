@@ -19,3 +19,17 @@ export function haversineDistanceMeters(
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   return EARTH_RADIUS_M * c
 }
+
+/**
+ * Lấy IP thật của client từ header — Vercel/proxy đặt IP client ở vị trí
+ * ĐẦU TIÊN trong `x-forwarded-for` (có thể có nhiều IP nếu qua nhiều proxy).
+ * `x-real-ip` dùng làm fallback cho môi trường không có x-forwarded-for.
+ */
+export function getClientIp(headers: Headers): string | null {
+  const forwardedFor = headers.get('x-forwarded-for')
+  if (forwardedFor) {
+    const first = forwardedFor.split(',')[0]?.trim()
+    if (first) return first
+  }
+  return headers.get('x-real-ip')
+}
