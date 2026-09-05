@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/lib/auth'
 import { getClientIp } from '@/lib/geo'
 import { euclideanDistance, FACE_MATCH_THRESHOLD } from '@/lib/face'
-import { evaluateLocation } from '@/lib/attendance'
+import { evaluateLocation, getEmployeeRequirements } from '@/lib/attendance'
 
 type Body = {
   lat?: unknown
@@ -52,12 +52,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Sai thứ tự chấm công — tải lại trang rồi thử lại' }, { status: 409 })
   }
 
+  // Điều kiện nào bắt buộc + có bị gán cố định 1 địa điểm hay không tuỳ theo
+  // cấu hình riêng của từng nhân viên (admin đặt ở /admin/yeu-cau-cham-cong).
+  const requirements = await getEmployeeRequirements(supabase, user!.id)
+
   const requestIp = getClientIp(req.headers)
   const { nearest, isWithinRadius, isIpVerified, ipMatchedLocationName, nearestIpOk } = await evaluateLocation(
     supabase,
     lat,
     lng,
     requestIp,
+    requirements.locationId,
   )
 
   // Xác thực khuôn mặt — trình duyệt đã tự trích embedding (128 số) ngay
@@ -81,7 +86,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const isSuccess = isWithinRadius && nearestIpOk && isFaceVerified
+  const gpsOk = !requirements.requireGps || isWithinRadius
+  const wifiOk = !requirements.requireWifi || nearestIpOk
+  const faceOk = !requirements.requireFace || isFaceVerified
+
+  const isSuccess = gpsOk && wifiOk && faceOk
 
   const { data: log, error: insertError } = await supabase
     .from('hrm_attendance_logs')
@@ -111,9 +120,9 @@ export async function POST(req: NextRequest) {
   let failReason: string | null = null
   if (!isSuccess) {
     const reasons: string[] = []
-    if (!isWithinRadius) reasons.push('ngoài khu vực GPS cho phép')
-    if (!nearestIpOk) reasons.push('sai mạng văn phòng')
-    if (!isFaceVerified) reasons.push(hasEnrollment ? 'khuôn mặt không khớp' : 'chưa đăng ký khuôn mặt')
+    if (!gpsOk) reasons.push('ngoài khu vực GPS cho phép')
+    if (!wifiOk) reasons.push('sai mạng văn phòng')
+    if (!faceOk) reasons.push(hasEnrollment ? 'khuôn mặt không khớp' : 'chưa đăng ký khuôn mặt')
     failReason = reasons.length > 0 ? reasons.join(', ') : 'không đạt điều kiện'
   }
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LogOut, MapPin, ClipboardList, Clock, ScanFace } from 'lucide-react'
+import { LogOut, MapPin, ClipboardList, Clock, ScanFace, SlidersHorizontal } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/contexts/auth'
 
@@ -38,6 +38,7 @@ export function Topbar() {
           {navItem('/', 'Chấm công', Clock)}
           {navItem('/dang-ky-khuon-mat', 'Khuôn mặt', ScanFace)}
           {isAdmin && navItem('/admin/dia-diem', 'Địa điểm', MapPin)}
+          {isAdmin && navItem('/admin/yeu-cau-cham-cong', 'Yêu cầu', SlidersHorizontal)}
           {isAdmin && navItem('/admin/bao-cao', 'Báo cáo', ClipboardList)}
         </nav>
       </div>
