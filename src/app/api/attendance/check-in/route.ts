@@ -91,6 +91,7 @@ export async function POST(req: NextRequest) {
       request_ip: requestIp,
       is_ip_verified: isIpVerified,
       is_success: isSuccess,
+      channel: 'web',
     })
     .select('id, type, created_at')
     .single()

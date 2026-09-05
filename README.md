@@ -12,7 +12,7 @@ cp .env.example .env.local   # điền NEXT_PUBLIC_SUPABASE_URL / ANON_KEY / SER
                               # (lấy từ project Supabase của hns-crm)
 ```
 
-Chạy migration tại `supabase/migrations/20260903_init_hrm_attendance.sql` trên
+Chạy các file trong `supabase/migrations/` (theo đúng thứ tự tên file) trên
 **Supabase SQL Editor** (chưa tự execute — theo đúng quy ước các app khác
 trong workspace, xem `AGENTS.md`/`CLAUDE_MEMORY.md` ở `d:\hns-erp`).
 
@@ -35,6 +35,34 @@ toàn công ty).
   văn phòng.
 - **`/admin/bao-cao`** (Super Admin/Boss) — xem 500 log chấm công gần nhất
   toàn công ty, kèm tên nhân viên, khoảng cách, cảnh báo ngoài vùng.
+- **Bot Telegram chấm công** — nhân viên liên kết tài khoản qua `/lien-ket-telegram`
+  (tạo mã 6 số, gửi `/link <mã>` cho bot), sau đó chỉ cần bấm nút "📍 Chấm công"
+  trong Telegram để chia sẻ vị trí — không cần mở trình duyệt. Xem setup bên dưới.
+
+### Setup bot Telegram
+
+1. Tạo bot qua [@BotFather](https://t.me/BotFather) trên Telegram (`/newbot`),
+   lấy token — điền vào `TELEGRAM_BOT_TOKEN` trong `.env.local`/Vercel.
+2. Tự đặt 1 chuỗi bí mật bất kỳ cho `TELEGRAM_WEBHOOK_SECRET` (dùng để xác
+   thực request đến webhook thật sự đến từ Telegram, không phải ai đó giả mạo
+   gọi thẳng URL webhook).
+3. Đặt `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` = username bot (không có @, vd
+   `HNS_HRM_bot`) — chỉ dùng để hiện link mời trong trang `/lien-ket-telegram`.
+4. Sau khi deploy, đăng ký webhook (chạy 1 lần, hoặc lại mỗi khi đổi secret):
+
+```bash
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://hrm.hanoisuntravel.com/api/telegram/webhook&secret_token=<SECRET>"
+```
+
+5. Test cục bộ (chưa deploy): dùng `ngrok http 3000` lấy URL public tạm thời,
+   trỏ `setWebhook` tạm vào URL ngrok đó — giống hệt cách ketoan đã làm.
+
+**Lưu ý quan trọng**: kênh Telegram **không** áp dụng được lớp check IP văn
+phòng (`office_ip`) — mọi request webhook đều đến từ server Telegram, không
+phải mạng thật của nhân viên. Chấm công qua Telegram chỉ xét điều kiện GPS
+(`is_within_radius`), cột `channel` trong `hrm_attendance_logs` phân biệt rõ
+lượt nào tới từ web (có check IP) và lượt nào từ Telegram (chỉ GPS) — xem cột
+"Kênh" trong `/admin/bao-cao`.
 
 ## Giới hạn đã biết (chưa làm ở v1)
 
