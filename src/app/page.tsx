@@ -1,13 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { CheckCircle2, XCircle, Loader2, MapPin, LogIn, LogOut, Wifi } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, LogIn, LogOut, Wifi } from 'lucide-react'
 
 type AttendanceLog = {
   id: string
   type: 'check_in' | 'check_out'
   created_at: string
   is_within_radius: boolean
+  is_ip_verified: boolean
+  is_success: boolean
   distance_m: number | null
   hrm_work_locations: { name: string } | null
 }
@@ -24,6 +26,8 @@ type CheckInResult = {
   isWithinRadius: boolean
   isIpVerified: boolean
   ipMatchedLocationName: string | null
+  isSuccess: boolean
+  failReason: string | null
 }
 
 function formatTime(iso: string) {
@@ -50,6 +54,8 @@ export default function ChamCongPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [lastResult, setLastResult] = useState<CheckInResult | null>(null)
+  const [lastSubmittedType, setLastSubmittedType] = useState<'check_in' | 'check_out' | null>(null)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
 
   const loadStatus = useCallback(async () => {
     setLoadingStatus(true)
@@ -65,11 +71,20 @@ export default function ChamCongPage() {
     loadStatus()
   }, [loadStatus])
 
+  // Tự đóng modal thành công sau vài giây, không bắt người dùng phải bấm tay.
+  useEffect(() => {
+    if (!showSuccessModal) return
+    const timer = setTimeout(() => setShowSuccessModal(false), 4000)
+    return () => clearTimeout(timer)
+  }, [showSuccessModal])
+
   async function handleCheckInOut() {
     if (!status || submitting) return
     setSubmitting(true)
     setError('')
     setLastResult(null)
+    const submittedType = status.nextType
+    setLastSubmittedType(submittedType)
     try {
       const position = await getPosition()
       const res = await fetch('/api/attendance/check-in', {
@@ -79,7 +94,7 @@ export default function ChamCongPage() {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
           accuracy: position.coords.accuracy,
-          type: status.nextType,
+          type: submittedType,
         }),
       })
       const data = await res.json()
@@ -88,6 +103,7 @@ export default function ChamCongPage() {
         return
       }
       setLastResult(data)
+      if (data.isSuccess) setShowSuccessModal(true)
       await loadStatus()
     } catch (err) {
       const geoErr = err as GeolocationPositionError
@@ -139,31 +155,17 @@ export default function ChamCongPage() {
           </div>
         )}
 
-        {lastResult && (
-          <div
-            className={`mt-4 flex items-start gap-2 text-left text-sm rounded-xl p-3 ${
-              lastResult.isWithinRadius ? 'text-green-700 bg-green-50' : 'text-amber-700 bg-amber-50'
-            }`}
-          >
-            {lastResult.isWithinRadius ? (
-              <CheckCircle2 size={16} className="shrink-0 mt-0.5" />
-            ) : (
-              <MapPin size={16} className="shrink-0 mt-0.5" />
-            )}
+        {/* Thất bại (thiếu GPS hoặc sai mạng) hiện banner cảnh báo tại chỗ —
+            chỉ trường hợp THÀNH CÔNG mới bật modal riêng bên dưới. */}
+        {lastResult && !lastResult.isSuccess && (
+          <div className="mt-4 flex items-start gap-2 text-left text-sm text-red-600 bg-red-50 rounded-xl p-3">
+            <XCircle size={16} className="shrink-0 mt-0.5" />
             <span>
-              {lastResult.nearestLocationName
-                ? `Cách "${lastResult.nearestLocationName}" ${lastResult.distanceM}m — ${
-                    lastResult.isWithinRadius ? 'trong khu vực cho phép' : 'ngoài khu vực cho phép, đã ghi nhận kèm cảnh báo'
-                  }`
-                : 'Chưa có địa điểm hợp lệ nào được cấu hình — đã ghi nhận vị trí'}
+              Chấm công KHÔNG hợp lệ — {lastResult.failReason ?? 'không đạt điều kiện'}.
+              {lastResult.nearestLocationName &&
+                ` (cách "${lastResult.nearestLocationName}" ${lastResult.distanceM}m)`}{' '}
+              Lượt này vẫn được lưu lại để quản lý xem xét.
             </span>
-          </div>
-        )}
-
-        {lastResult?.isIpVerified && (
-          <div className="mt-2 flex items-center gap-2 text-left text-xs text-brand-600 bg-brand-50 rounded-xl p-2.5">
-            <Wifi size={13} className="shrink-0" />
-            <span>Đúng mạng "{lastResult.ipMatchedLocationName}"</span>
           </div>
         )}
       </div>
@@ -181,13 +183,51 @@ export default function ChamCongPage() {
                     <LogOut size={14} className="text-accent-500" />
                   )}
                   {log.type === 'check_in' ? 'Vào' : 'Ra'}
-                  {!log.is_within_radius && (
-                    <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">ngoài khu vực</span>
+                  {log.is_success ? (
+                    log.is_ip_verified && <Wifi size={12} className="text-brand-400" />
+                  ) : (
+                    <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">thất bại</span>
                   )}
                 </span>
                 <span className="text-gray-500">{formatTime(log.created_at)}</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modal chấm công thành công */}
+      {showSuccessModal && lastResult?.isSuccess && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setShowSuccessModal(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-8 text-center shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-50">
+              <CheckCircle2 size={32} className="text-green-500" />
+            </div>
+            <h2 className="mb-1 text-lg font-bold text-gray-800">
+              {lastSubmittedType === 'check_in' ? 'Chấm công vào thành công!' : 'Chấm công ra thành công!'}
+            </h2>
+            <p className="mb-4 text-sm text-gray-500">
+              {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+              {lastResult.nearestLocationName ? ` · ${lastResult.nearestLocationName}` : ''}
+            </p>
+            {lastResult.isIpVerified && (
+              <div className="mb-4 flex items-center justify-center gap-1.5 rounded-xl bg-brand-50 p-2 text-xs text-brand-600">
+                <Wifi size={13} />
+                Đúng mạng "{lastResult.ipMatchedLocationName}"
+              </div>
+            )}
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="w-full rounded-xl bg-accent-500 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-600"
+            >
+              Đóng
+            </button>
           </div>
         </div>
       )}
