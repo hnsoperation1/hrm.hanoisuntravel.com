@@ -20,11 +20,14 @@ export function sendMessage(chatId: number, text: string, replyMarkup?: Record<s
   })
 }
 
-/** Bàn phím có nút "chia sẻ vị trí" — bấm vào là hệ điều hành tự xin quyền
- * định vị và gửi thẳng toạ độ cho bot, không cần mở trình duyệt. */
-export function locationKeyboard() {
+/** Nút mở trang chấm công dưới dạng Telegram Web App (Mini App) — hiển thị
+ * nhúng ngay trong Telegram, không bật trình duyệt riêng. Trỏ thẳng vào `/`
+ * (trang chấm công gốc) — chạy như trình duyệt thật (IP thật, cookie thật)
+ * nên đăng nhập Supabase Auth hoạt động bình thường: lần đầu mở sẽ ra màn
+ * đăng nhập, các lần sau giữ nguyên session như web bình thường. */
+export function openAppButton() {
   return {
-    keyboard: [[{ text: '📍 Chấm công (chia sẻ vị trí)', request_location: true }]],
+    keyboard: [[{ text: '📍 Chấm công', web_app: { url: process.env.NEXT_PUBLIC_APP_URL } }]],
     resize_keyboard: true,
   }
 }

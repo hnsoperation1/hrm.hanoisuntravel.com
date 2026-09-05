@@ -35,9 +35,12 @@ toàn công ty).
   văn phòng.
 - **`/admin/bao-cao`** (Super Admin/Boss) — xem 500 log chấm công gần nhất
   toàn công ty, kèm tên nhân viên, khoảng cách, cảnh báo ngoài vùng.
-- **Bot Telegram chấm công** — nhân viên liên kết tài khoản qua `/lien-ket-telegram`
-  (tạo mã 6 số, gửi `/link <mã>` cho bot), sau đó chỉ cần bấm nút "📍 Chấm công"
-  trong Telegram để chia sẻ vị trí — không cần mở trình duyệt. Xem setup bên dưới.
+- **Bot Telegram** — bấm nút "📍 Chấm công" trong Telegram sẽ mở thẳng trang
+  `/` dưới dạng **Telegram Web App** (nhúng trong Telegram, không bật trình
+  duyệt riêng). Trang chạy như trình duyệt thật (IP thật, cookie thật) nên
+  đăng nhập Supabase Auth hoạt động bình thường — lần đầu mở sẽ ra màn đăng
+  nhập, các lần sau giữ nguyên session. Không có cơ chế liên kết tài khoản
+  riêng — bot chỉ đóng vai trò "lối tắt" mở web. Xem setup bên dưới.
 
 ### Setup bot Telegram
 
@@ -46,23 +49,24 @@ toàn công ty).
 2. Tự đặt 1 chuỗi bí mật bất kỳ cho `TELEGRAM_WEBHOOK_SECRET` (dùng để xác
    thực request đến webhook thật sự đến từ Telegram, không phải ai đó giả mạo
    gọi thẳng URL webhook).
-3. Đặt `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` = username bot (không có @, vd
-   `HNS_HRM_bot`) — chỉ dùng để hiện link mời trong trang `/lien-ket-telegram`.
+3. Đặt `NEXT_PUBLIC_APP_URL` = domain đã deploy (vd `https://hrm.hanoisuntravel.com`,
+   **không** có dấu `/` ở cuối) — bot dùng để dựng nút mở trang chấm công.
+   Telegram **bắt buộc URL Web App phải là HTTPS**, không nhận `http://localhost`.
 4. Sau khi deploy, đăng ký webhook (chạy 1 lần, hoặc lại mỗi khi đổi secret):
 
 ```bash
 curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://hrm.hanoisuntravel.com/api/telegram/webhook&secret_token=<SECRET>"
 ```
 
-5. Test cục bộ (chưa deploy): dùng `ngrok http 3000` lấy URL public tạm thời,
-   trỏ `setWebhook` tạm vào URL ngrok đó — giống hệt cách ketoan đã làm.
+5. Test cục bộ (chưa deploy): dùng `ngrok http 3000` lấy URL public HTTPS tạm
+   thời, trỏ cả `setWebhook` và `NEXT_PUBLIC_APP_URL` vào URL ngrok đó.
 
-**Lưu ý quan trọng**: kênh Telegram **không** áp dụng được lớp check IP văn
-phòng (`office_ip`) — mọi request webhook đều đến từ server Telegram, không
-phải mạng thật của nhân viên. Chấm công qua Telegram chỉ xét điều kiện GPS
-(`is_within_radius`), cột `channel` trong `hrm_attendance_logs` phân biệt rõ
-lượt nào tới từ web (có check IP) và lượt nào từ Telegram (chỉ GPS) — xem cột
-"Kênh" trong `/admin/bao-cao`.
+**Lưu ý**: bảng `hrm_telegram_links`/`hrm_telegram_link_codes` và giá trị
+`channel = 'telegram'`/`'telegram_webapp'` trong migrations là tàn dư của 1
+thiết kế cũ (bot tự nhận vị trí + liên kết tài khoản riêng) đã bỏ — không còn
+code nào dùng tới, chấm công qua Telegram giờ luôn ghi `channel = 'web'` như
+mở bằng trình duyệt thường. Có thể dọn các bảng đó sau nếu chắc chắn không
+cần nữa, không bắt buộc vì không gây hại khi để không dùng.
 
 ## Giới hạn đã biết (chưa làm ở v1)
 

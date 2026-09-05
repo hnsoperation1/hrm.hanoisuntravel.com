@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LogOut, MapPin, ClipboardList, Clock, Send } from 'lucide-react'
+import { LogOut, MapPin, ClipboardList, Clock } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/contexts/auth'
 
@@ -35,7 +35,6 @@ export function Topbar() {
         </div>
         <nav className="flex items-center gap-1">
           {navItem('/', 'Chấm công', Clock)}
-          {navItem('/lien-ket-telegram', 'Telegram', Send)}
           {isAdmin && navItem('/admin/dia-diem', 'Địa điểm', MapPin)}
           {isAdmin && navItem('/admin/bao-cao', 'Báo cáo', ClipboardList)}
         </nav>
