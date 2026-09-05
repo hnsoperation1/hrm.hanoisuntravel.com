@@ -28,6 +28,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Dữ liệu vị trí không hợp lệ' }, { status: 400 })
   }
 
+  // Mỗi ngày chỉ ghi nhận đúng 1 lần vào + 1 lần ra — chặn ở server (không
+  // chỉ ẩn nút trên UI), vì client hoàn toàn có thể tự gọi thẳng API này.
+  const startOfDay = new Date()
+  startOfDay.setHours(0, 0, 0, 0)
+  const { data: todaySuccessLogs } = await supabase
+    .from('hrm_attendance_logs')
+    .select('type')
+    .eq('user_id', user!.id)
+    .eq('is_success', true)
+    .gte('created_at', startOfDay.toISOString())
+
+  const hasCheckIn = (todaySuccessLogs ?? []).some((l) => l.type === 'check_in')
+  const hasCheckOut = (todaySuccessLogs ?? []).some((l) => l.type === 'check_out')
+  if (hasCheckIn && hasCheckOut) {
+    return NextResponse.json(
+      { error: 'Đã hoàn tất chấm công hôm nay (đủ 1 lần vào + 1 lần ra), không thể chấm công thêm' },
+      { status: 409 },
+    )
+  }
+  if ((type === 'check_in' && hasCheckIn) || (type === 'check_out' && !hasCheckIn)) {
+    return NextResponse.json({ error: 'Sai thứ tự chấm công — tải lại trang rồi thử lại' }, { status: 409 })
+  }
+
   const { data: locations, error: locError } = await supabase
     .from('hrm_work_locations')
     .select('id, name, lat, lng, radius_m, office_ip')

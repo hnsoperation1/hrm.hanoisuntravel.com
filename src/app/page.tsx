@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { CheckCircle2, XCircle, Loader2, LogIn, LogOut, Wifi, ScanFace } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, LogIn, LogOut, Wifi, ScanFace, CalendarCheck, Trash2 } from 'lucide-react'
 import { FaceCapture } from '@/components/FaceCapture'
+import { useAuth } from '@/contexts/auth'
 
 type AttendanceLog = {
   id: string
@@ -19,7 +20,10 @@ type AttendanceLog = {
 type StatusResponse = {
   logs: AttendanceLog[]
   nextType: 'check_in' | 'check_out'
+  dayComplete: boolean
 }
+
+type Employee = { id: string; full_name: string; email: string }
 
 type CheckInResult = {
   nearestLocationName: string | null
@@ -52,7 +56,20 @@ function getPosition(): Promise<GeolocationPosition> {
   })
 }
 
+function todayIsoDate() {
+  const d = new Date()
+  const offset = d.getTimezoneOffset()
+  return new Date(d.getTime() - offset * 60000).toISOString().slice(0, 10)
+}
+
 export default function ChamCongPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.is_super_admin || user?.is_boss
+  const [resetDate, setResetDate] = useState(todayIsoDate())
+  const [resetting, setResetting] = useState(false)
+  const [resetMsg, setResetMsg] = useState('')
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [resetUserId, setResetUserId] = useState('')
   const [status, setStatus] = useState<StatusResponse | null>(null)
   const [loadingStatus, setLoadingStatus] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -62,6 +79,7 @@ export default function ChamCongPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [pendingPosition, setPendingPosition] = useState<GeolocationPosition | null>(null)
   const [showFaceCapture, setShowFaceCapture] = useState(false)
+  const [showConfirmOut, setShowConfirmOut] = useState(false)
 
   const loadStatus = useCallback(async () => {
     setLoadingStatus(true)
@@ -77,6 +95,15 @@ export default function ChamCongPage() {
     loadStatus()
   }, [loadStatus])
 
+  useEffect(() => {
+    if (!isAdmin) return
+    fetch('/api/admin/employees')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setEmployees(data.employees)
+      })
+  }, [isAdmin])
+
   // Tự đóng modal thành công sau vài giây, không bắt người dùng phải bấm tay.
   useEffect(() => {
     if (!showSuccessModal) return
@@ -85,7 +112,7 @@ export default function ChamCongPage() {
   }, [showSuccessModal])
 
   async function handleCheckInOut() {
-    if (!status || submitting) return
+    if (!status || submitting || status.dayComplete) return
     setSubmitting(true)
     setError('')
     setLastResult(null)
@@ -150,7 +177,50 @@ export default function ChamCongPage() {
     setPendingPosition(null)
   }
 
+  // Chấm công vào thì bấm là chạy luôn; chấm công RA cần xác nhận lại trước
+  // — tránh bấm nhầm lúc đang định bấm "vào" (nút đổi màu/label theo trạng
+  // thái, dễ bấm nhầm khi thao tác nhanh), hậu quả "ra" nhầm nặng hơn "vào" nhầm.
+  function handleButtonClick() {
+    if (!status || submitting || status.dayComplete) return
+    if (status.nextType === 'check_out') {
+      setShowConfirmOut(true)
+      return
+    }
+    handleCheckInOut()
+  }
+
+  function handleConfirmOut() {
+    setShowConfirmOut(false)
+    handleCheckInOut()
+  }
+
+  async function handleResetDay() {
+    const target = resetUserId ? employees.find((e) => e.id === resetUserId) : null
+    const targetLabel = target ? `${target.full_name} (${target.email})` : 'CHÍNH BẠN'
+    if (!confirm(`Xoá toàn bộ chấm công của ${targetLabel} ngày ${resetDate}? Không hoàn tác được.`)) return
+    setResetting(true)
+    setResetMsg('')
+    try {
+      const res = await fetch('/api/admin/attendance/reset-day', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: resetDate, userId: resetUserId || undefined }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setResetMsg(data.error ?? 'Không xoá được')
+        return
+      }
+      setResetMsg(`Đã xoá ${data.deleted} log`)
+      await loadStatus()
+    } finally {
+      setResetting(false)
+    }
+  }
+
   const isCheckIn = status?.nextType === 'check_in'
+  const lastCheckInLog = status?.logs.filter((l) => l.type === 'check_in' && l.is_success).at(-1)
+  const lastCheckInTime = lastCheckInLog ? formatTime(lastCheckInLog.created_at) : null
 
   return (
     <div className="max-w-md mx-auto px-4 py-10">
@@ -160,22 +230,29 @@ export default function ChamCongPage() {
         </p>
         <h1 className="text-lg font-bold text-gray-800 mb-6">Chấm công</h1>
 
-        <button
-          onClick={handleCheckInOut}
-          disabled={loadingStatus || submitting}
-          className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-base font-bold text-white transition-colors disabled:opacity-60 ${
-            isCheckIn ? 'bg-brand-500 hover:bg-brand-600' : 'bg-accent-500 hover:bg-accent-600'
-          }`}
-        >
-          {submitting ? (
-            <Loader2 size={18} className="animate-spin" />
-          ) : isCheckIn ? (
-            <LogIn size={18} />
-          ) : (
-            <LogOut size={18} />
-          )}
-          {submitting ? 'Đang xử lý...' : isCheckIn ? 'Chấm công vào' : 'Chấm công ra'}
-        </button>
+        {status?.dayComplete ? (
+          <div className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-sm font-semibold bg-green-50 text-green-700">
+            <CalendarCheck size={18} />
+            Đã hoàn tất chấm công hôm nay
+          </div>
+        ) : (
+          <button
+            onClick={handleButtonClick}
+            disabled={loadingStatus || submitting}
+            className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-base font-bold text-white transition-colors disabled:opacity-60 ${
+              isCheckIn ? 'bg-brand-500 hover:bg-brand-600' : 'bg-accent-500 hover:bg-accent-600'
+            }`}
+          >
+            {submitting ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : isCheckIn ? (
+              <LogIn size={18} />
+            ) : (
+              <LogOut size={18} />
+            )}
+            {submitting ? 'Đang xử lý...' : isCheckIn ? 'Chấm công vào' : 'Chấm công ra'}
+          </button>
+        )}
 
         {error && (
           <div className="mt-4 flex items-start gap-2 text-left text-sm text-red-600 bg-red-50 rounded-xl p-3">
@@ -228,6 +305,45 @@ export default function ChamCongPage() {
         </div>
       )}
 
+      {isAdmin && (
+        <div className="mt-6 rounded-2xl border border-dashed border-amber-300 bg-amber-50/60 p-4">
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-amber-700">Công cụ quản trị — xoá chấm công</p>
+          <p className="mb-3 text-xs text-amber-700">
+            Xoá toàn bộ chấm công của 1 nhân viên trong 1 ngày (mặc định chính bạn) — dùng để test hoặc sửa dữ liệu lỗi.
+            Không hoàn tác được.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={resetUserId}
+              onChange={(e) => setResetUserId(e.target.value)}
+              className="rounded-lg border border-amber-300 bg-white px-2 py-1.5 text-sm min-w-[160px]"
+            >
+              <option value="">Chính tôi</option>
+              {employees.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.full_name} ({emp.email})
+                </option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={resetDate}
+              onChange={(e) => setResetDate(e.target.value)}
+              className="rounded-lg border border-amber-300 bg-white px-2 py-1.5 text-sm"
+            />
+            <button
+              onClick={handleResetDay}
+              disabled={resetting}
+              className="flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-60"
+            >
+              {resetting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              Xoá dữ liệu ngày này
+            </button>
+          </div>
+          {resetMsg && <p className="mt-2 text-xs text-amber-800">{resetMsg}</p>}
+        </div>
+      )}
+
       {/* Modal chấm công thành công */}
       {showSuccessModal && lastResult?.isSuccess && (
         <div
@@ -266,6 +382,41 @@ export default function ChamCongPage() {
             >
               Đóng
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Xác nhận chấm công ra */}
+      {showConfirmOut && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setShowConfirmOut(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-8 text-center shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent-50">
+              <LogOut size={32} className="text-accent-500" />
+            </div>
+            <h2 className="mb-1 text-lg font-bold text-gray-800">Xác nhận chấm công ra?</h2>
+            <p className="mb-6 text-sm text-gray-500">
+              {lastCheckInTime ? `Bạn đã chấm công vào lúc ${lastCheckInTime} hôm nay.` : 'Xác nhận bạn muốn kết thúc ca làm hôm nay.'}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirmOut(false)}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-gray-600 transition-colors hover:bg-gray-50"
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={handleConfirmOut}
+                className="flex-1 rounded-xl bg-accent-500 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-600"
+              >
+                Chấm công ra
+              </button>
+            </div>
           </div>
         </div>
       )}

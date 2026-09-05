@@ -25,8 +25,12 @@ export async function GET() {
   // bại (sai vị trí/mạng) vẫn được lưu để làm bằng chứng, nhưng không được
   // tính là "đã vào/đã ra" thật sự.
   const successLogs = (logs ?? []).filter((l) => l.is_success)
-  const lastLog = successLogs.length > 0 ? successLogs[successLogs.length - 1] : null
-  const nextType: 'check_in' | 'check_out' = lastLog?.type === 'check_in' ? 'check_out' : 'check_in'
+  const hasCheckIn = successLogs.some((l) => l.type === 'check_in')
+  const hasCheckOut = successLogs.some((l) => l.type === 'check_out')
+  // Mỗi ngày chỉ ghi nhận đúng 1 lần vào + 1 lần ra — đủ cả 2 rồi thì khoá
+  // hẳn, không cho chấm công thêm trong ngày đó nữa.
+  const dayComplete = hasCheckIn && hasCheckOut
+  const nextType: 'check_in' | 'check_out' = hasCheckIn ? 'check_out' : 'check_in'
 
-  return NextResponse.json({ logs: logs ?? [], nextType })
+  return NextResponse.json({ logs: logs ?? [], nextType, dayComplete })
 }
