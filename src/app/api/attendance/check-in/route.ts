@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/lib/auth'
 import { getClientIp, haversineDistanceMeters } from '@/lib/geo'
+import { euclideanDistance, FACE_MATCH_THRESHOLD } from '@/lib/face'
 
 type Body = {
   lat?: unknown
   lng?: unknown
   accuracy?: unknown
   type?: unknown
+  faceEmbedding?: unknown
 }
 
 export async function POST(req: NextRequest) {
@@ -14,7 +16,7 @@ export async function POST(req: NextRequest) {
   if (unauthorized) return unauthorized
 
   const body = (await req.json().catch(() => null)) as Body | null
-  const { lat, lng, accuracy, type } = body ?? {}
+  const { lat, lng, accuracy, type, faceEmbedding } = body ?? {}
 
   if (
     typeof lat !== 'number' ||
@@ -77,6 +79,25 @@ export async function POST(req: NextRequest) {
 
   const isSuccess = isWithinRadius && nearestIpOk
 
+  // Xác thực khuôn mặt — trình duyệt đã tự trích embedding (128 số) ngay
+  // trên thiết bị, server chỉ so sánh với embedding đã đăng ký của CHÍNH
+  // nhân viên đang gọi API này (không nhận diện "đây là ai", chỉ trả lời
+  // "có đúng là người đã đăng ký user_id này không"). CHƯA bắt buộc vào
+  // is_success — chỉ ghi nhận, giống is_ip_verified lúc mới thêm.
+  let isFaceVerified = false
+  let faceDistance: number | null = null
+  if (Array.isArray(faceEmbedding) && faceEmbedding.length === 128) {
+    const { data: enrollment } = await supabase
+      .from('hrm_face_enrollments')
+      .select('embedding')
+      .eq('user_id', user!.id)
+      .maybeSingle()
+    if (enrollment) {
+      faceDistance = euclideanDistance(faceEmbedding as number[], enrollment.embedding as number[])
+      isFaceVerified = faceDistance <= FACE_MATCH_THRESHOLD
+    }
+  }
+
   const { data: log, error: insertError } = await supabase
     .from('hrm_attendance_logs')
     .insert({
@@ -91,6 +112,8 @@ export async function POST(req: NextRequest) {
       request_ip: requestIp,
       is_ip_verified: isIpVerified,
       is_success: isSuccess,
+      is_face_verified: isFaceVerified,
+      face_distance: faceDistance,
       channel: 'web',
     })
     .select('id, type, created_at')
@@ -121,5 +144,7 @@ export async function POST(req: NextRequest) {
     ipMatchedLocationName,
     isSuccess,
     failReason,
+    isFaceVerified,
+    faceDistance,
   })
 }

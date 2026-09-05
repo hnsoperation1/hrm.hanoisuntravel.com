@@ -11,7 +11,7 @@ export async function GET() {
   const { data: logs, error } = await supabase
     .from('hrm_attendance_logs')
     .select(
-      'id, type, created_at, is_within_radius, is_ip_verified, is_success, distance_m, hrm_work_locations(name)',
+      'id, type, created_at, is_within_radius, is_ip_verified, is_face_verified, is_success, distance_m, hrm_work_locations(name)',
     )
     .eq('user_id', user!.id)
     .gte('created_at', startOfDay.toISOString())

@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { CheckCircle2, XCircle, Loader2, LogIn, LogOut, Wifi } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, LogIn, LogOut, Wifi, ScanFace } from 'lucide-react'
+import { FaceCapture } from '@/components/FaceCapture'
 
 type AttendanceLog = {
   id: string
@@ -9,6 +10,7 @@ type AttendanceLog = {
   created_at: string
   is_within_radius: boolean
   is_ip_verified: boolean
+  is_face_verified: boolean
   is_success: boolean
   distance_m: number | null
   hrm_work_locations: { name: string } | null
@@ -28,6 +30,8 @@ type CheckInResult = {
   ipMatchedLocationName: string | null
   isSuccess: boolean
   failReason: string | null
+  isFaceVerified: boolean
+  faceDistance: number | null
 }
 
 function formatTime(iso: string) {
@@ -56,6 +60,8 @@ export default function ChamCongPage() {
   const [lastResult, setLastResult] = useState<CheckInResult | null>(null)
   const [lastSubmittedType, setLastSubmittedType] = useState<'check_in' | 'check_out' | null>(null)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [pendingPosition, setPendingPosition] = useState<GeolocationPosition | null>(null)
+  const [showFaceCapture, setShowFaceCapture] = useState(false)
 
   const loadStatus = useCallback(async () => {
     setLoadingStatus(true)
@@ -83,28 +89,10 @@ export default function ChamCongPage() {
     setSubmitting(true)
     setError('')
     setLastResult(null)
-    const submittedType = status.nextType
-    setLastSubmittedType(submittedType)
     try {
       const position = await getPosition()
-      const res = await fetch('/api/attendance/check-in', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          type: submittedType,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error ?? 'Chấm công thất bại')
-        return
-      }
-      setLastResult(data)
-      if (data.isSuccess) setShowSuccessModal(true)
-      await loadStatus()
+      setPendingPosition(position)
+      setShowFaceCapture(true)
     } catch (err) {
       const geoErr = err as GeolocationPositionError
       if (typeof geoErr?.code === 'number') {
@@ -116,9 +104,50 @@ export default function ChamCongPage() {
       } else {
         setError(err instanceof Error ? err.message : 'Có lỗi xảy ra')
       }
-    } finally {
       setSubmitting(false)
     }
+  }
+
+  async function submitCheckIn(faceEmbedding: number[]) {
+    setShowFaceCapture(false)
+    if (!status || !pendingPosition) {
+      setSubmitting(false)
+      return
+    }
+    const submittedType = status.nextType
+    setLastSubmittedType(submittedType)
+    try {
+      const res = await fetch('/api/attendance/check-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lat: pendingPosition.coords.latitude,
+          lng: pendingPosition.coords.longitude,
+          accuracy: pendingPosition.coords.accuracy,
+          type: submittedType,
+          faceEmbedding,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? 'Chấm công thất bại')
+        return
+      }
+      setLastResult(data)
+      if (data.isSuccess) setShowSuccessModal(true)
+      await loadStatus()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Có lỗi xảy ra')
+    } finally {
+      setSubmitting(false)
+      setPendingPosition(null)
+    }
+  }
+
+  function handleFaceCancel() {
+    setShowFaceCapture(false)
+    setSubmitting(false)
+    setPendingPosition(null)
   }
 
   const isCheckIn = status?.nextType === 'check_in'
@@ -145,7 +174,7 @@ export default function ChamCongPage() {
           ) : (
             <LogOut size={18} />
           )}
-          {submitting ? 'Đang lấy vị trí...' : isCheckIn ? 'Chấm công vào' : 'Chấm công ra'}
+          {submitting ? 'Đang xử lý...' : isCheckIn ? 'Chấm công vào' : 'Chấm công ra'}
         </button>
 
         {error && (
@@ -184,7 +213,10 @@ export default function ChamCongPage() {
                   )}
                   {log.type === 'check_in' ? 'Vào' : 'Ra'}
                   {log.is_success ? (
-                    log.is_ip_verified && <Wifi size={12} className="text-brand-400" />
+                    <>
+                      {log.is_ip_verified && <Wifi size={12} className="text-brand-400" />}
+                      {log.is_face_verified && <ScanFace size={12} className="text-brand-400" />}
+                    </>
                   ) : (
                     <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">thất bại</span>
                   )}
@@ -217,9 +249,15 @@ export default function ChamCongPage() {
               {lastResult.nearestLocationName ? ` · ${lastResult.nearestLocationName}` : ''}
             </p>
             {lastResult.isIpVerified && (
-              <div className="mb-4 flex items-center justify-center gap-1.5 rounded-xl bg-brand-50 p-2 text-xs text-brand-600">
+              <div className="mb-2 flex items-center justify-center gap-1.5 rounded-xl bg-brand-50 p-2 text-xs text-brand-600">
                 <Wifi size={13} />
                 Đúng mạng "{lastResult.ipMatchedLocationName}"
+              </div>
+            )}
+            {lastResult.isFaceVerified && (
+              <div className="mb-4 flex items-center justify-center gap-1.5 rounded-xl bg-brand-50 p-2 text-xs text-brand-600">
+                <ScanFace size={13} />
+                Đã xác thực khuôn mặt
               </div>
             )}
             <button
@@ -231,6 +269,8 @@ export default function ChamCongPage() {
           </div>
         </div>
       )}
+
+      {showFaceCapture && <FaceCapture onCapture={submitCheckIn} onCancel={handleFaceCancel} />}
     </div>
   )
 }

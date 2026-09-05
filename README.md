@@ -35,6 +35,8 @@ toàn công ty).
   văn phòng.
 - **`/admin/bao-cao`** (Super Admin/Boss) — xem 500 log chấm công gần nhất
   toàn công ty, kèm tên nhân viên, khoảng cách, cảnh báo ngoài vùng.
+- **`/dang-ky-khuon-mat`** — nhân viên tự đăng ký khuôn mặt (1 lần, đăng ký
+  lại bất kỳ lúc nào). Xem chi tiết ở mục riêng bên dưới.
 - **Bot Telegram** — bấm nút "📍 Chấm công" trong Telegram sẽ mở thẳng trang
   `/` dưới dạng **Telegram Web App** (nhúng trong Telegram, không bật trình
   duyệt riêng). Trang chạy như trình duyệt thật (IP thật, cookie thật) nên
@@ -68,13 +70,48 @@ code nào dùng tới, chấm công qua Telegram giờ luôn ghi `channel = 'web
 mở bằng trình duyệt thường. Có thể dọn các bảng đó sau nếu chắc chắn không
 cần nữa, không bắt buộc vì không gây hại khi để không dùng.
 
+## Xác thực khuôn mặt (chạy hoàn toàn trên thiết bị)
+
+Dùng [`face-api.js`](https://github.com/justadudewhohacks/face-api.js) chạy
+trong trình duyệt (TensorFlow.js, backend WebGL/WASM) — **không gọi dịch vụ
+bên ngoài, không tốn phí theo lượt, không gửi ảnh lên server**:
+
+1. Nhân viên vào `/dang-ky-khuon-mat`, trình duyệt tự trích "embedding" (128
+   số đặc trưng khuôn mặt) từ ảnh mẫu, gửi vector đó (không phải ảnh) lên
+   lưu trong bảng `hrm_face_enrollments`.
+2. Mỗi lần chấm công ở `/`, ngay sau khi lấy GPS, trình duyệt tự mở camera,
+   trích embedding mới, gửi kèm request `/api/attendance/check-in`.
+3. Server so khoảng cách Euclid giữa 2 embedding (ngưỡng chuẩn `0.6` của
+   `face-api.js`) — khớp thì `is_face_verified = true`, ghi cả khoảng cách
+   (`face_distance`) để tiện audit.
+
+**Model weights** (~7MB, tải 1 lần từ `justadudewhohacks/face-api.js` GitHub
+repo, đã copy sẵn vào `public/models/` trong repo này — không cần tải lại
+khi setup máy mới, chỉ cần `git clone` là có đủ).
+
+**Quan trọng — CHƯA bắt buộc để tính `is_success`**: giống cách `is_ip_verified`
+từng bắt đầu, khuôn mặt hiện chỉ được **ghi nhận**, chưa đưa vào điều kiện
+chấm công hợp lệ. Muốn bắt buộc khớp khuôn mặt mới tính thành công, sửa dòng
+`isSuccess` trong `src/app/api/attendance/check-in/route.ts` thêm điều kiện
+`isFaceVerified` — cần cân nhắc trước vì sẽ chặn cứng nhân viên chưa đăng ký
+khuôn mặt.
+
 ## Giới hạn đã biết (chưa làm ở v1)
 
 - Chưa chống giả lập GPS (mock location) — Geolocation API trình duyệt không
   có cách phát hiện việc này từ phía web. Muốn chặt hơn cần app di động native
-  (đọc được flag `isMock` trên Android) hoặc kết hợp thêm xác thực khuôn mặt
-  (đã bàn riêng, chưa triển khai).
+  (đọc được flag `isMock` trên Android).
+- Xác thực khuôn mặt **chưa có liveness** (chống ảnh in/quay lại màn hình) —
+  chỉ so khớp đặc trưng khuôn mặt, ai cầm ảnh in rõ nét của người khác vẫn có
+  thể qua được. Muốn thêm cần tự viết logic chớp mắt/quay đầu qua landmark
+  (`face-api.js` đã trả sẵn 68 điểm landmark, chưa dùng tới) hoặc chuyển sang
+  dịch vụ thương mại có liveness (đã bàn, không chọn vì tốn phí/hạ tầng).
 - Chưa có ràng buộc "1 ca = tối đa 1 lần vào + 1 lần ra" — loại type gửi từ
   client được tin theo trạng thái UI, chưa validate chặt phía server.
 - RLS chặn insert đúng `user_id = auth.uid()` (không giả mạo chấm công hộ
   người khác qua API), nhưng không chặn tự chấm công nhiều lần liên tiếp.
+- `hrm_face_enrollments` cho phép nhân viên tự đăng ký lại bất kỳ lúc nào,
+  không cần admin duyệt — nghĩa là 1 nhân viên có thể tự thay embedding tham
+  chiếu của chính mình. Đủ dùng cho mục đích hiện tại (chỉ ghi nhận, chưa
+  chặn cứng), nhưng nếu sau này bắt buộc khớp khuôn mặt mới cho chấm công,
+  nên cân nhắc thêm bước admin khoá lại sau lần đăng ký đầu.

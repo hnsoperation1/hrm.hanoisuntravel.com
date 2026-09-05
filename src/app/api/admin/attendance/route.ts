@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from('hrm_attendance_logs')
     .select(
-      'id, user_id, type, created_at, lat, lng, accuracy_m, distance_m, is_within_radius, is_ip_verified, is_success, channel, hrm_work_locations(name), users(full_name, email)',
+      'id, user_id, type, created_at, lat, lng, accuracy_m, distance_m, is_within_radius, is_ip_verified, is_face_verified, face_distance, is_success, channel, hrm_work_locations(name), users(full_name, email)',
     )
     .order('created_at', { ascending: false })
     .limit(500)
