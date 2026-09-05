@@ -8,10 +8,24 @@ import { loadFaceModels, quickDetectFace, extractFaceEmbedding } from '@/lib/fac
 // khuôn mặt mới thoáng qua khung hình (rung tay, đưa điện thoại lên).
 const STABLE_DETECTIONS_REQUIRED = 3
 const POLL_INTERVAL_MS = 350
-// Nghỉ 1 nhịp giữa các mẫu khi chụp nhiều ảnh (đăng ký) — vừa để nhân viên
-// kịp hơi đổi góc mặt/biểu cảm giữa các lần chụp (đa dạng mẫu hơn là chụp
-// liên tiếp cùng 1 khung hình gần như y hệt), vừa tránh chụp dính liền nhau.
-const PAUSE_BETWEEN_SAMPLES_MS = 700
+// Nghỉ 1 nhịp giữa các mẫu khi chụp nhiều ảnh (đăng ký) — đủ thời gian đọc
+// hướng dẫn tư thế tiếp theo trước khi hệ thống bắt đầu tìm mặt lại.
+const PAUSE_BETWEEN_SAMPLES_MS = 900
+
+// Thứ tự tư thế yêu cầu khi đăng ký nhiều mẫu — mỗi mẫu 1 góc mặt khác nhau
+// thay vì chụp liên tiếp gần như y hệt nhau, giúp so khớp chính xác hơn với
+// các góc chấm công thực tế sau này.
+const POSE_INSTRUCTIONS = [
+  'Nhìn thẳng vào camera',
+  'Xoay mặt sang trái',
+  'Xoay mặt sang phải',
+  'Ngẩng mặt lên',
+  'Cúi mặt xuống',
+]
+
+function poseLabelFor(index: number): string {
+  return POSE_INSTRUCTIONS[index] ?? POSE_INSTRUCTIONS[POSE_INSTRUCTIONS.length - 1]
+}
 
 /** 1 mẫu chụp = 1 embedding (để so khớp) + 1 ảnh JPEG dạng dataURL (để admin
  * xem lại bằng mắt, xác minh nhân viên đăng ký đúng khuôn mặt của mình). */
@@ -56,6 +70,11 @@ export function FaceCapture({
   const stableCountRef = useRef(0)
   const busyRef = useRef(false)
   const samplesRef = useRef<FaceSample[]>([])
+  // Sau khi chụp xong 1 mẫu (đăng ký nhiều mẫu), CHỜ thấy mặt biến mất khỏi
+  // khung hình ít nhất 1 lần (tức nhân viên đã thực sự xoay đầu theo hướng
+  // dẫn) rồi mới tính lại số lần phát hiện ổn định — nếu không, hệ thống chụp
+  // liền tấm tiếp theo gần như giống hệt tấm trước vì họ chưa kịp đổi tư thế.
+  const awaitingPoseChangeRef = useRef(false)
   // 'error' ở đây CHỈ dùng cho lỗi camera/model không có đường lùi (không mở
   // được camera) — thất bại khi trích đặc trưng chỉ là hint tạm thời, vòng
   // quét vẫn tiếp tục chạy ngầm để tự thử lại, không được để chết hẳn.
@@ -89,6 +108,13 @@ export function FaceCapture({
           if (busyRef.current || !videoRef.current) return
           const found = await quickDetectFace(videoRef.current)
           if (cancelled) return
+
+          if (awaitingPoseChangeRef.current) {
+            if (!found) awaitingPoseChangeRef.current = false
+            setStatus('searching')
+            return
+          }
+
           if (found) {
             stableCountRef.current += 1
             setStatus('found')
@@ -105,10 +131,12 @@ export function FaceCapture({
                   if (pollTimer) clearInterval(pollTimer)
                   onCapture(samplesRef.current)
                 } else {
-                  // Còn thiếu mẫu — nghỉ 1 nhịp rồi quét tiếp cho mẫu kế tiếp.
+                  // Còn thiếu mẫu — nghỉ 1 nhịp cho kịp đọc hướng dẫn tư thế
+                  // mới, rồi bắt buộc phải THẤY MẶT BIẾN MẤT ít nhất 1 lần
+                  // (xoay đầu ra khỏi góc cũ) trước khi tìm mặt ổn định lại.
                   stableCountRef.current = 0
                   setStatus('searching')
-                  setHint(`Đã chụp ${samplesRef.current.length}/${sampleCount} — giữ nguyên, chụp tiếp...`)
+                  if (sampleCount > 1) awaitingPoseChangeRef.current = true
                   pauseTimer = setTimeout(() => {
                     busyRef.current = false
                   }, PAUSE_BETWEEN_SAMPLES_MS)
@@ -153,34 +181,36 @@ export function FaceCapture({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-gray-800">
-            {title}
-            {sampleCount > 1 && (
-              <span className="ml-1.5 font-normal text-gray-400">
-                ({captured}/{sampleCount})
-              </span>
-            )}
-          </h2>
-          <button type="button" onClick={handleCancel} className="text-gray-400 hover:text-gray-600 p-1">
-            <X size={18} />
-          </button>
-        </div>
+    <div className="fixed inset-0 z-50 flex flex-col bg-white text-center">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <h2 className="text-sm font-bold text-gray-800">{title}</h2>
+        <button type="button" onClick={handleCancel} className="text-gray-400 hover:text-gray-600 p-1">
+          <X size={18} />
+        </button>
+      </div>
 
-        <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-gray-900">
-          <video ref={videoRef} muted playsInline className="h-full w-full object-cover -scale-x-100" />
-          {status !== 'error' && (
-            <div
-              className={`pointer-events-none absolute inset-6 rounded-full border-4 transition-colors ${
-                status === 'found' || status === 'processing' ? 'border-green-400' : 'border-white/50'
-              }`}
-            />
-          )}
+      {sampleCount > 1 && (status === 'searching' || status === 'found' || status === 'processing') && (
+        <div className="bg-brand-50 px-4 py-3 text-center">
+          <p className="text-base font-bold text-brand-700">{poseLabelFor(Math.min(captured, sampleCount - 1))}</p>
+          <p className="mt-0.5 text-xs text-brand-400">
+            Ảnh {Math.min(captured + 1, sampleCount)}/{sampleCount}
+          </p>
         </div>
+      )}
 
-        <div className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-600 min-h-[20px]">
+      <div className="relative aspect-square w-full overflow-hidden bg-gray-900">
+        <video ref={videoRef} muted playsInline className="h-full w-full object-cover -scale-x-100" />
+        {status !== 'error' && (
+          <div
+            className={`pointer-events-none absolute inset-6 rounded-full border-4 transition-colors ${
+              status === 'found' || status === 'processing' ? 'border-green-400' : 'border-white/50'
+            }`}
+          />
+        )}
+      </div>
+
+      <div className="flex-1 flex flex-col items-center justify-center px-4 gap-3">
+        <div className="flex items-center justify-center gap-2 text-sm text-gray-600 min-h-[20px]">
           {status === 'loading' && (
             <>
               <Loader2 size={15} className="animate-spin" /> Đang tải model nhận diện...
@@ -208,7 +238,7 @@ export function FaceCapture({
           <button
             type="button"
             onClick={handleCancel}
-            className="mt-3 w-full rounded-xl border border-gray-200 py-2 text-sm text-gray-600 hover:bg-gray-50"
+            className="w-full max-w-xs rounded-xl border border-gray-200 py-2 text-sm text-gray-600 hover:bg-gray-50"
           >
             Đóng
           </button>
