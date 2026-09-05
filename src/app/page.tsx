@@ -162,12 +162,15 @@ export default function ChamCongPage() {
       }
       setLastResult(data)
       if (data.isSuccess) setShowSuccessModal(true)
-      await loadStatus()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Có lỗi xảy ra')
     } finally {
       setSubmitting(false)
       setPendingPosition(null)
+      // Luôn làm mới trạng thái dù thành công hay bị server từ chối (vd đã
+      // đủ 1 vào + 1 ra) — trước đây chỉ gọi khi thành công, khiến giao diện
+      // hiện nút cũ dù server đã coi ngày đó là xong, dễ bấm thêm vô ích.
+      await loadStatus()
     }
   }
 
