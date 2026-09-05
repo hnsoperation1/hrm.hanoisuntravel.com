@@ -119,6 +119,29 @@ export default function ChamCongPage() {
     setLastResult(null)
     try {
       const position = await getPosition()
+
+      // Kiểm tra nhanh GPS/IP trước khi mở camera — sai thì báo luôn, không
+      // bắt nhân viên chụp ảnh khuôn mặt vô ích vì kiểu gì cũng thất bại.
+      const precheckRes = await fetch('/api/attendance/precheck', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: position.coords.latitude, lng: position.coords.longitude }),
+      })
+      const precheck = await precheckRes.json()
+      if (!precheckRes.ok) {
+        setError(precheck.error ?? 'Không kiểm tra được vị trí')
+        setSubmitting(false)
+        return
+      }
+      if (!precheck.ok) {
+        setError(
+          `Không đạt điều kiện chấm công — ${precheck.failReason}` +
+            (precheck.nearestLocationName ? ` (cách "${precheck.nearestLocationName}" ${precheck.distanceM}m)` : ''),
+        )
+        setSubmitting(false)
+        return
+      }
+
       setPendingPosition(position)
       setShowFaceCapture(true)
     } catch (err) {
@@ -301,14 +324,7 @@ export default function ChamCongPage() {
                     <Wifi size={12} />
                     {log.distance_m != null ? `${Math.round(log.distance_m)}m` : '—'}
                   </span>
-                  <span
-                    className={`flex items-center gap-0.5 text-xs ${
-                      log.is_face_verified ? 'text-green-600' : 'text-red-500'
-                    }`}
-                  >
-                    <ScanFace size={12} />
-                    {log.face_distance != null ? log.face_distance.toFixed(2) : '—'}
-                  </span>
+                  <ScanFace size={12} className={log.is_face_verified ? 'text-green-600' : 'text-red-500'} />
                   {!log.is_success && (
                     <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">thất bại</span>
                   )}
