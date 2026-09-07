@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/lib/auth'
 import { getClientIp } from '@/lib/geo'
-import { euclideanDistance, FACE_MATCH_THRESHOLD } from '@/lib/face'
-import { evaluateLocation, getEmployeeRequirements } from '@/lib/attendance'
+import { euclideanDistance } from '@/lib/face'
+import { evaluateLocation, getEmployeeRequirements, getFaceMatchThreshold } from '@/lib/attendance'
 
 type Body = {
   lat?: unknown
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
         euclideanDistance(faceEmbedding as number[], sample),
       )
       faceDistance = Math.min(...distances)
-      isFaceVerified = faceDistance <= FACE_MATCH_THRESHOLD
+      isFaceVerified = faceDistance <= (await getFaceMatchThreshold(supabase))
     }
   }
 

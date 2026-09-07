@@ -29,6 +29,10 @@ export default function YeuCauChamCongPage() {
   const [faceData, setFaceData] = useState<Map<string, FaceEnrollment>>(new Map())
   const [expandedFaceId, setExpandedFaceId] = useState<string | null>(null)
   const [expandedVectorId, setExpandedVectorId] = useState<string | null>(null)
+  const [threshold, setThreshold] = useState<number | null>(null)
+  const [thresholdInput, setThresholdInput] = useState('')
+  const [savingThreshold, setSavingThreshold] = useState(false)
+  const [thresholdMsg, setThresholdMsg] = useState('')
 
   async function load() {
     setLoading(true)
@@ -49,10 +53,44 @@ export default function YeuCauChamCongPage() {
     }
   }
 
+  async function loadSettings() {
+    const res = await fetch('/api/admin/settings')
+    if (res.ok) {
+      const data = await res.json()
+      setThreshold(data.faceMatchThreshold)
+      setThresholdInput(String(data.faceMatchThreshold))
+    }
+  }
+
   useEffect(() => {
     load()
     loadFaceData()
+    loadSettings()
   }, [])
+
+  async function saveThreshold() {
+    const value = parseFloat(thresholdInput)
+    if (Number.isNaN(value) || value <= 0 || value > 1) {
+      setThresholdMsg('Giá trị phải trong khoảng (0, 1]')
+      return
+    }
+    setSavingThreshold(true)
+    setThresholdMsg('')
+    const res = await fetch('/api/admin/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ faceMatchThreshold: value }),
+    })
+    setSavingThreshold(false)
+    if (res.ok) {
+      setThreshold(value)
+      setThresholdMsg('Đã lưu')
+      setTimeout(() => setThresholdMsg(''), 2000)
+    } else {
+      const data = await res.json().catch(() => ({}))
+      setThresholdMsg(data.error ?? 'Lưu thất bại')
+    }
+  }
 
   async function saveField(emp: Employee, patch: Partial<Employee>) {
     // Cập nhật lạc quan trên giao diện trước, rồi mới gọi API — cảm giác bấm
@@ -84,6 +122,44 @@ export default function YeuCauChamCongPage() {
         Bỏ tick 1 điều kiện = nhân viên đó không cần đạt điều kiện đó mới được tính chấm công thành công. Gán địa
         điểm = luôn tính theo đúng địa điểm đó, không tự động lấy địa điểm gần nhất nữa.
       </p>
+
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 mb-6">
+        <h2 className="text-sm font-bold text-gray-800 mb-1 flex items-center gap-1.5">
+          <ScanFace size={14} className="text-brand-500" />
+          Ngưỡng khớp khuôn mặt (áp dụng chung cho tất cả nhân viên)
+        </h2>
+        <p className="text-xs text-gray-400 mb-3">
+          Khoảng cách giữa embedding lúc chấm công và mẫu đã đăng ký càng NHỎ càng giống nhau. Giá trị càng thấp
+          càng chặt (khó giả mạo hơn nhưng dễ từ chối nhầm chính chủ khi ảnh sáng/góc mặt kém). Mặc định 0.3.
+        </p>
+        {threshold === null ? (
+          <p className="text-xs text-gray-400 flex items-center gap-2">
+            <Loader2 size={13} className="animate-spin" /> Đang tải...
+          </p>
+        ) : (
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              max="1"
+              value={thresholdInput}
+              onChange={(e) => setThresholdInput(e.target.value)}
+              className="w-28 text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-400"
+            />
+            <button
+              type="button"
+              onClick={saveThreshold}
+              disabled={savingThreshold || thresholdInput === String(threshold)}
+              className="flex items-center gap-1.5 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-xl"
+            >
+              {savingThreshold && <Loader2 size={14} className="animate-spin" />}
+              Lưu
+            </button>
+            {thresholdMsg && <span className="text-xs text-gray-500">{thresholdMsg}</span>}
+          </div>
+        )}
+      </div>
 
       {loading ? (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 text-sm text-gray-400 flex items-center gap-2">

@@ -111,3 +111,18 @@ export async function getEmployeeRequirements(supabase: any, userId: string): Pr
     locationId: data?.location_id ?? null,
   }
 }
+
+// Ngưỡng mặc định nếu vì lý do gì đó chưa có dòng cấu hình nào trong DB
+// (chưa chạy migration, hoặc lỡ bị xoá) — giữ đúng giá trị đã chốt trước khi
+// có bảng cấu hình này.
+const DEFAULT_FACE_MATCH_THRESHOLD = 0.3
+
+/**
+ * Đọc ngưỡng khớp khuôn mặt hiện tại (admin chỉnh ở /admin/yeu-cau-cham-cong) —
+ * dùng chung cho route check-in thật sự thực thi so khớp.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getFaceMatchThreshold(supabase: any): Promise<number> {
+  const { data } = await supabase.from('hrm_app_settings').select('face_match_threshold').eq('id', 1).maybeSingle()
+  return typeof data?.face_match_threshold === 'number' ? data.face_match_threshold : DEFAULT_FACE_MATCH_THRESHOLD
+}
