@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CheckCircle2, ChevronLeft, Loader2, MapPin, ScanFace, Wifi, XCircle, type LucideIcon } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, Loader2, MapPin, Wifi, XCircle, type LucideIcon } from 'lucide-react'
 import { FaceCapture, type FaceSample } from './FaceCapture'
 
 type StepKind = 'wifi' | 'gps' | 'face'
@@ -32,9 +32,9 @@ type Props = {
   onComplete: (result: CheckInWizardResult) => void
 }
 
-const STEP_META: Record<Exclude<StepKind, 'face'>, { title: string; Icon: LucideIcon }> = {
-  wifi: { title: 'Xác thực Wi-Fi', Icon: Wifi },
-  gps: { title: 'Xác thực vị trí', Icon: MapPin },
+const STEP_META: Record<Exclude<StepKind, 'face'>, { title: string; Icon: LucideIcon; checkingLabel: string }> = {
+  wifi: { title: 'Xác thực Wi-Fi', Icon: Wifi, checkingLabel: 'Đang kiểm tra mạng Wi-Fi văn phòng...' },
+  gps: { title: 'Xác thực vị trí', Icon: MapPin, checkingLabel: 'Đang xác định vị trí...' },
 }
 
 function getPosition(): Promise<GeolocationPosition> {
@@ -71,56 +71,46 @@ function Shell({ title, onBack, children }: { title: string; onBack: () => void;
  * cho qua bước tiếp theo. Bước nào không bị bắt buộc (admin tắt ở
  * /admin/yeu-cau-cham-cong) thì tự động BỎ QUA, không hiện ra.
  *
+ * QUAN TRỌNG: vào Bước 1 là hiện NGAY (không có màn "đang tải" trung gian
+ * trước khi thấy số bước) — quá trình xin GPS + gọi API kiểm tra Wi-Fi/vị
+ * trí chạy NGẦM ngay bên trong màn Bước 1, tự chuyển từ spinner "đang kiểm
+ * tra" sang kết quả thành công/thất bại tại chỗ. Trước đây gộp chờ cả 2 điều
+ * kiện xong xuôi ở 1 màn hình riêng rồi mới vào Bước 1 — sai vì người dùng
+ * không thấy Bước 1 "đang chạy", chỉ thấy kết quả có sẵn.
+ *
  * Lưu ý: trình duyệt KHÔNG có API đọc tên mạng Wi-Fi thật — bước "Wi-Fi" ở
  * đây kiểm tra bằng địa chỉ IP công cộng so với danh sách IP văn phòng đã
  * cấu hình, không phải đọc SSID thật như app native.
  */
 export function CheckInWizard({ type, onCancel, onComplete }: Props) {
-  const [phase, setPhase] = useState<'locating' | 'steps' | 'submitting' | 'error'>('locating')
+  const [phase, setPhase] = useState<'steps' | 'submitting' | 'error'>('steps')
   const [fatalError, setFatalError] = useState('')
   const [steps, setSteps] = useState<StepKind[] | null>(null)
   const [stepIndex, setStepIndex] = useState(0)
   const [precheck, setPrecheck] = useState<PrecheckResult | null>(null)
   const positionRef = useRef<GeolocationPosition | null>(null)
 
-  const init = useCallback(async () => {
-    setPhase('locating')
+  // Xin GPS + gọi precheck — chạy NGAY khi Bước 1 đã hiện lên màn hình, không
+  // chờ trước ở đâu cả. Dùng cho cả lần đầu vào wizard lẫn bấm "Thử lại".
+  const loadChecks = useCallback(async () => {
+    setPrecheck(null)
     setFatalError('')
     try {
-      const [requirements, position] = await Promise.all([
-        fetch('/api/attendance/requirements').then((r) => r.json()),
-        getPosition(),
-      ])
+      const position = await getPosition()
       positionRef.current = position
 
-      const precheckRes = await fetch('/api/attendance/precheck', {
+      const res = await fetch('/api/attendance/precheck', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lat: position.coords.latitude, lng: position.coords.longitude }),
       })
-      const precheckData = await precheckRes.json()
-      if (!precheckRes.ok) {
-        setFatalError(precheckData.error ?? 'Không kiểm tra được vị trí')
+      const data = await res.json()
+      if (!res.ok) {
+        setFatalError(data.error ?? 'Không kiểm tra được vị trí')
         setPhase('error')
         return
       }
-      setPrecheck(precheckData)
-
-      const stepList: StepKind[] = []
-      if (requirements.requireWifi) stepList.push('wifi')
-      if (requirements.requireGps) stepList.push('gps')
-      if (requirements.requireFace) stepList.push('face')
-
-      if (stepList.length === 0) {
-        // Không bị bắt buộc điều kiện nào cả — chấm công thẳng luôn, không
-        // cần wizard hiện bước gì.
-        await submitFinal(position, undefined)
-        return
-      }
-
-      setStepIndex(0)
-      setSteps(stepList)
-      setPhase('steps')
+      setPrecheck(data)
     } catch (err) {
       const geoErr = err as GeolocationPositionError
       if (typeof geoErr?.code === 'number') {
@@ -134,12 +124,47 @@ export function CheckInWizard({ type, onCancel, onComplete }: Props) {
       }
       setPhase('error')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
+    let cancelled = false
+    async function init() {
+      try {
+        const requirements = await fetch('/api/attendance/requirements').then((r) => r.json())
+        if (cancelled) return
+
+        const stepList: StepKind[] = []
+        if (requirements.requireWifi) stepList.push('wifi')
+        if (requirements.requireGps) stepList.push('gps')
+        if (requirements.requireFace) stepList.push('face')
+
+        if (stepList.length === 0) {
+          // Không bị bắt buộc điều kiện nào cả — chấm công thẳng luôn, không
+          // cần hiện bước nào.
+          setPhase('submitting')
+          const position = await getPosition()
+          if (cancelled) return
+          positionRef.current = position
+          await submitFinal(position, undefined)
+          return
+        }
+
+        setStepIndex(0)
+        setSteps(stepList)
+        // Bước 1 hiện ngay, việc kiểm tra Wi-Fi/vị trí chạy ngầm bên trong nó.
+        loadChecks()
+      } catch (err) {
+        if (cancelled) return
+        setFatalError(err instanceof Error ? err.message : 'Có lỗi xảy ra')
+        setPhase('error')
+      }
+    }
     init()
-  }, [init])
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function submitFinal(position: GeolocationPosition, faceEmbedding: number[] | undefined) {
     setPhase('submitting')
@@ -184,17 +209,6 @@ export function CheckInWizard({ type, onCancel, onComplete }: Props) {
     setStepIndex(next)
   }
 
-  if (phase === 'locating') {
-    return (
-      <Shell title={type === 'check_in' ? 'Chấm công vào' : 'Chấm công ra'} onBack={onCancel}>
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-gray-500">
-          <Loader2 size={28} className="animate-spin" />
-          <p className="text-sm">Đang lấy vị trí GPS...</p>
-        </div>
-      </Shell>
-    )
-  }
-
   if (phase === 'submitting') {
     return (
       <Shell title={type === 'check_in' ? 'Chấm công vào' : 'Chấm công ra'} onBack={onCancel}>
@@ -224,89 +238,99 @@ export function CheckInWizard({ type, onCancel, onComplete }: Props) {
     )
   }
 
-  // phase === 'steps'
-  const currentKind = steps![stepIndex]
+  // phase === 'steps' — steps chắc chắn đã có giá trị ở đây (đã set trước khi
+  // vào phase này), TypeScript chưa suy luận được nên vẫn cần steps!.
+  if (!steps) return null
+  const currentKind = steps[stepIndex]
 
   if (currentKind === 'face') {
     return (
       <FaceCapture
         onCapture={handleFaceCapture}
         onCancel={onCancel}
-        title={`Bước ${stepIndex + 1}/${steps!.length} — Khuôn mặt`}
+        title={`Bước ${stepIndex + 1}/${steps.length} — Khuôn mặt`}
       />
     )
   }
 
-  const { title, Icon } = STEP_META[currentKind]
-  const stepOk = currentKind === 'wifi' ? precheck!.wifiOk : precheck!.gpsOk
+  const { title, Icon, checkingLabel } = STEP_META[currentKind]
+  const checking = precheck === null
+  const stepOk = !checking && (currentKind === 'wifi' ? precheck.wifiOk : precheck.gpsOk)
 
   return (
     <Shell title={type === 'check_in' ? 'Chấm công vào' : 'Chấm công ra'} onBack={onCancel}>
       <div className="flex items-center justify-between px-4 pt-4">
         <h2 className="text-base font-bold text-gray-800">{title}</h2>
         <span className="text-sm text-gray-400">
-          Bước <span className="font-bold text-gray-700">{stepIndex + 1}</span>/{steps!.length}
+          Bước <span className="font-bold text-gray-700">{stepIndex + 1}</span>/{steps.length}
         </span>
       </div>
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6">
-        <Icon size={72} className={stepOk ? 'text-accent-500' : 'text-red-400'} />
-        <div className="flex items-center gap-2 text-sm font-medium">
-          {stepOk ? (
-            <>
-              <CheckCircle2 size={18} className="text-green-500" />
-              <span className="text-gray-700">Thành công</span>
-            </>
-          ) : (
-            <>
-              <XCircle size={18} className="text-red-500" />
-              <span className="text-gray-700">Thất bại</span>
-            </>
-          )}
+      {checking ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-gray-500">
+          <Loader2 size={32} className="animate-spin" />
+          <p className="text-sm">{checkingLabel}</p>
         </div>
-        <p className="text-center text-sm text-gray-500">
-          {currentKind === 'wifi'
-            ? stepOk
-              ? `Đúng mạng văn phòng${precheck!.nearestLocationName ? ` "${precheck!.nearestLocationName}"` : ''}`
-              : 'IP hiện tại không khớp mạng văn phòng nào'
-            : stepOk
-              ? `Trong phạm vi cho phép${precheck!.nearestLocationName ? ` (${precheck!.nearestLocationName})` : ''}${
-                  precheck!.distanceM != null ? ` — cách ${precheck!.distanceM}m` : ''
-                }`
-              : `Ngoài phạm vi cho phép${precheck!.distanceM != null ? ` — cách ${precheck!.distanceM}m` : ''}`}
-        </p>
+      ) : (
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6">
+          <Icon size={72} className={stepOk ? 'text-accent-500' : 'text-red-400'} />
+          <div className="flex items-center gap-2 text-sm font-medium">
+            {stepOk ? (
+              <>
+                <CheckCircle2 size={18} className="text-green-500" />
+                <span className="text-gray-700">Thành công</span>
+              </>
+            ) : (
+              <>
+                <XCircle size={18} className="text-red-500" />
+                <span className="text-gray-700">Thất bại</span>
+              </>
+            )}
+          </div>
+          <p className="text-center text-sm text-gray-500">
+            {currentKind === 'wifi'
+              ? stepOk
+                ? `Đúng mạng văn phòng${precheck.nearestLocationName ? ` "${precheck.nearestLocationName}"` : ''}`
+                : 'IP hiện tại không khớp mạng văn phòng nào'
+              : stepOk
+                ? `Trong phạm vi cho phép${precheck.nearestLocationName ? ` (${precheck.nearestLocationName})` : ''}${
+                    precheck.distanceM != null ? ` — cách ${precheck.distanceM}m` : ''
+                  }`
+                : `Ngoài phạm vi cho phép${precheck.distanceM != null ? ` — cách ${precheck.distanceM}m` : ''}`}
+          </p>
 
-        {/* Nút bấm nằm NGAY dưới dòng kết quả — trước đây neo tận đáy màn
-            hình, cách xa nội dung, phải với tay quá xa mới bấm được. */}
-        <div className="w-full pt-2">
-          {stepOk ? (
-            <button
-              type="button"
-              onClick={advanceStep}
-              className="w-full rounded-xl bg-brand-500 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-600"
-            >
-              Tiếp theo
-            </button>
-          ) : (
-            <div className="flex gap-3">
+          {/* Nút bấm nằm NGAY dưới dòng kết quả — dễ với tay bấm hơn thay vì
+              neo tận đáy màn hình. */}
+          <div className="w-full pt-2">
+            {stepOk ? (
               <button
                 type="button"
-                onClick={onCancel}
-                className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-bold text-gray-600 transition-colors hover:bg-gray-50"
+                onClick={advanceStep}
+                className="w-full rounded-xl bg-brand-500 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-600"
               >
-                Đóng
+                Tiếp theo
               </button>
-              <button
-                type="button"
-                onClick={init}
-                className="flex-1 rounded-xl bg-brand-500 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-600"
-              >
-                Thử lại
-              </button>
-            </div>
-          )}
+            ) : (
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-bold text-gray-600 transition-colors hover:bg-gray-50"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  onClick={loadChecks}
+                  className="flex-1 rounded-xl bg-brand-500 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-600"
+                >
+                  Thử lại
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </Shell>
   )
 }
