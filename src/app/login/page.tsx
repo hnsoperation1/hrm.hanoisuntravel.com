@@ -30,7 +30,7 @@ export default function LoginPage() {
             <span className="text-brand-600">i</span>
             <span className="text-accent-500">HNS</span>
           </div>
-          <p className="text-base text-gray-400 mt-2">Hanoi Sun Travel staff&apos;s app</p>
+          <p className="text-base text-gray-400 mt-2">Hanoi Sun Travel Staff App</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
