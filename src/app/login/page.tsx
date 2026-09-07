@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { useAuth } from '@/contexts/auth'
 
@@ -11,19 +11,6 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
-
-  // DEBUG TẠM THỜI — điều tra vụ Chrome mobile bị đăng xuất khi reload còn
-  // Safari thì không. Chỉ hiện TÊN cookie (không hiện giá trị) để xem cookie
-  // "sb-...-auth-token" có thực sự tồn tại lúc quay lại trang login hay
-  // không. XOÁ đoạn này sau khi xác định được nguyên nhân.
-  const [debugCookies, setDebugCookies] = useState('')
-  useEffect(() => {
-    const names = document.cookie
-      .split(';')
-      .map((c) => c.split('=')[0].trim())
-      .filter(Boolean)
-    setDebugCookies(names.length > 0 ? names.join(', ') : '(không có cookie nào)')
-  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -88,9 +75,6 @@ export default function LoginPage() {
             Đăng nhập
           </button>
         </form>
-
-        {/* DEBUG TẠM THỜI — xoá sau khi điều tra xong vụ Chrome mobile */}
-        <p className="mt-4 break-all text-center text-[10px] text-gray-300">Cookies: {debugCookies}</p>
       </div>
     </div>
   )
