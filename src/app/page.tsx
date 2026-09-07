@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, XCircle, Loader2, LogIn, LogOut, Wifi, ScanFace, CalendarCheck, Trash2 } from 'lucide-react'
-import { FaceCapture, type FaceSample } from '@/components/FaceCapture'
+import { CheckInWizard, type CheckInWizardResult } from '@/components/CheckInWizard'
 import { useAuth } from '@/contexts/auth'
 
 type AttendanceLog = {
@@ -27,35 +27,8 @@ type StatusResponse = {
 
 type Employee = { id: string; full_name: string; email: string }
 
-type CheckInResult = {
-  nearestLocationName: string | null
-  distanceM: number | null
-  radiusM: number | null
-  isWithinRadius: boolean
-  isIpVerified: boolean
-  ipMatchedLocationName: string | null
-  isSuccess: boolean
-  failReason: string | null
-  isFaceVerified: boolean
-  faceDistance: number | null
-}
-
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-}
-
-function getPosition(): Promise<GeolocationPosition> {
-  return new Promise((resolve, reject) => {
-    if (!('geolocation' in navigator)) {
-      reject(new Error('Trình duyệt không hỗ trợ định vị'))
-      return
-    }
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 0,
-    })
-  })
 }
 
 function todayIsoDate() {
@@ -74,13 +47,10 @@ export default function ChamCongPage() {
   const [resetUserId, setResetUserId] = useState('')
   const [status, setStatus] = useState<StatusResponse | null>(null)
   const [loadingStatus, setLoadingStatus] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-  const [lastResult, setLastResult] = useState<CheckInResult | null>(null)
+  const [lastResult, setLastResult] = useState<CheckInWizardResult | null>(null)
   const [lastSubmittedType, setLastSubmittedType] = useState<'check_in' | 'check_out' | null>(null)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
-  const [pendingPosition, setPendingPosition] = useState<GeolocationPosition | null>(null)
-  const [showFaceCapture, setShowFaceCapture] = useState(false)
+  const [showWizard, setShowWizard] = useState(false)
   const [showConfirmOut, setShowConfirmOut] = useState(false)
   const [faceEnrolled, setFaceEnrolled] = useState<boolean | null>(null)
 
@@ -125,116 +95,41 @@ export default function ChamCongPage() {
     return () => clearTimeout(timer)
   }, [showSuccessModal])
 
-  async function handleCheckInOut() {
-    if (!status || submitting || status.dayComplete) return
-    setSubmitting(true)
-    setError('')
+  // Mở wizard chấm công theo từng bước (Wi-Fi → vị trí → khuôn mặt) — toàn
+  // bộ logic lấy GPS/kiểm tra điều kiện/chụp mặt/gửi API nằm trong
+  // CheckInWizard, trang này chỉ cần biết wizard xong thì cập nhật gì.
+  function openWizard() {
+    if (!status) return
+    setLastSubmittedType(status.nextType)
     setLastResult(null)
-    try {
-      const position = await getPosition()
-
-      // Kiểm tra nhanh GPS/IP trước khi mở camera — sai thì báo luôn, không
-      // bắt nhân viên chụp ảnh khuôn mặt vô ích vì kiểu gì cũng thất bại.
-      const precheckRes = await fetch('/api/attendance/precheck', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat: position.coords.latitude, lng: position.coords.longitude }),
-      })
-      const precheck = await precheckRes.json()
-      if (!precheckRes.ok) {
-        setError(precheck.error ?? 'Không kiểm tra được vị trí')
-        setSubmitting(false)
-        return
-      }
-      if (!precheck.ok) {
-        setError(
-          `Không đạt điều kiện chấm công — ${precheck.failReason}` +
-            (precheck.nearestLocationName ? ` (cách "${precheck.nearestLocationName}" ${precheck.distanceM}m)` : ''),
-        )
-        setSubmitting(false)
-        return
-      }
-
-      setPendingPosition(position)
-      setShowFaceCapture(true)
-    } catch (err) {
-      const geoErr = err as GeolocationPositionError
-      if (typeof geoErr?.code === 'number') {
-        setError(
-          geoErr.code === geoErr.PERMISSION_DENIED
-            ? 'Bạn cần cho phép truy cập vị trí để chấm công'
-            : 'Không lấy được vị trí GPS — thử lại ở nơi tín hiệu tốt hơn',
-        )
-      } else {
-        setError(err instanceof Error ? err.message : 'Có lỗi xảy ra')
-      }
-      setSubmitting(false)
-    }
+    setShowWizard(true)
   }
 
-  async function submitCheckIn(faceSamples: FaceSample[]) {
-    setShowFaceCapture(false)
-    if (!status || !pendingPosition) {
-      setSubmitting(false)
-      return
-    }
-    const submittedType = status.nextType
-    setLastSubmittedType(submittedType)
-    try {
-      const res = await fetch('/api/attendance/check-in', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lat: pendingPosition.coords.latitude,
-          lng: pendingPosition.coords.longitude,
-          accuracy: pendingPosition.coords.accuracy,
-          type: submittedType,
-          // Chấm công chỉ chụp 1 ảnh (FaceCapture mặc định sampleCount=1) —
-          // lấy phần tử đầu tiên, khác lúc đăng ký chụp nhiều ảnh mẫu. Ảnh
-          // snapshot đi kèm không cần gửi lên đây, chỉ dùng lúc đăng ký.
-          faceEmbedding: faceSamples[0]?.embedding,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error ?? 'Chấm công thất bại')
-        return
-      }
-      setLastResult(data)
-      if (data.isSuccess) setShowSuccessModal(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Có lỗi xảy ra')
-    } finally {
-      setSubmitting(false)
-      setPendingPosition(null)
-      // Luôn làm mới trạng thái dù thành công hay bị server từ chối (vd đã
-      // đủ 1 vào + 1 ra) — trước đây chỉ gọi khi thành công, khiến giao diện
-      // hiện nút cũ dù server đã coi ngày đó là xong, dễ bấm thêm vô ích.
-      await loadStatus()
-    }
-  }
-
-  function handleFaceCancel() {
-    setShowFaceCapture(false)
-    setSubmitting(false)
-    setPendingPosition(null)
+  async function handleWizardComplete(result: CheckInWizardResult) {
+    setShowWizard(false)
+    setLastResult(result)
+    if (result.isSuccess) setShowSuccessModal(true)
+    // Luôn làm mới trạng thái dù thành công hay bị server từ chối (vd đã đủ
+    // 1 vào + 1 ra) — tránh giao diện hiện nút cũ dù server đã coi ngày đó
+    // là xong, dễ bấm thêm vô ích.
+    await loadStatus()
   }
 
   // Chấm công vào thì bấm là chạy luôn; chấm công RA cần xác nhận lại trước
   // — tránh bấm nhầm lúc đang định bấm "vào" (nút đổi màu/label theo trạng
   // thái, dễ bấm nhầm khi thao tác nhanh), hậu quả "ra" nhầm nặng hơn "vào" nhầm.
   function handleButtonClick() {
-    if (!status || submitting || status.dayComplete) return
+    if (!status || status.dayComplete) return
     if (status.nextType === 'check_out') {
       setShowConfirmOut(true)
       return
     }
-    handleCheckInOut()
+    openWizard()
   }
 
   function handleConfirmOut() {
     setShowConfirmOut(false)
-    handleCheckInOut()
+    openWizard()
   }
 
   async function handleResetDay() {
@@ -281,31 +176,19 @@ export default function ChamCongPage() {
         ) : (
           <button
             onClick={handleButtonClick}
-            disabled={loadingStatus || submitting}
+            disabled={loadingStatus}
             className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-base font-bold text-white transition-colors disabled:opacity-60 ${
               isCheckIn ? 'bg-brand-500 hover:bg-brand-600' : 'bg-accent-500 hover:bg-accent-600'
             }`}
           >
-            {submitting ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : isCheckIn ? (
-              <LogIn size={18} />
-            ) : (
-              <LogOut size={18} />
-            )}
-            {submitting ? 'Đang xử lý...' : isCheckIn ? 'Chấm công vào' : 'Chấm công ra'}
+            {isCheckIn ? <LogIn size={18} /> : <LogOut size={18} />}
+            {isCheckIn ? 'Chấm công vào' : 'Chấm công ra'}
           </button>
         )}
 
-        {error && (
-          <div className="mt-4 flex items-start gap-2 text-left text-sm text-red-600 bg-red-50 rounded-xl p-3">
-            <XCircle size={16} className="shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* Thất bại (thiếu GPS hoặc sai mạng) hiện banner cảnh báo tại chỗ —
-            chỉ trường hợp THÀNH CÔNG mới bật modal riêng bên dưới. */}
+        {/* Thất bại (thiếu GPS hoặc sai mạng lúc GỬI THẬT, dù wizard đã cho
+            qua từng bước) hiện banner cảnh báo tại chỗ — chỉ trường hợp
+            THÀNH CÔNG mới bật modal riêng bên dưới. */}
         {lastResult && !lastResult.isSuccess && (
           <div className="mt-4 flex items-start gap-2 text-left text-sm text-red-600 bg-red-50 rounded-xl p-3">
             <XCircle size={16} className="shrink-0 mt-0.5" />
@@ -487,7 +370,13 @@ export default function ChamCongPage() {
         </div>
       )}
 
-      {showFaceCapture && <FaceCapture onCapture={submitCheckIn} onCancel={handleFaceCancel} />}
+      {showWizard && status && (
+        <CheckInWizard
+          type={status.nextType}
+          onCancel={() => setShowWizard(false)}
+          onComplete={handleWizardComplete}
+        />
+      )}
     </div>
   )
 }

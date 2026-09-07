@@ -38,6 +38,10 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: gpsOk && wifiOk,
+    // Tách riêng từng điều kiện (thay vì chỉ có `ok` gộp) để wizard chấm công
+    // hiện được kết quả TỪNG BƯỚC (Wi-Fi, vị trí) độc lập với nhau.
+    gpsOk,
+    wifiOk,
     nearestLocationName: nearest?.name ?? null,
     distanceM: nearest ? Math.round(nearest.distance) : null,
     failReason: reasons.length > 0 ? reasons.join(', ') : null,

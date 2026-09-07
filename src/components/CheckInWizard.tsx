@@ -1,0 +1,310 @@
+'use client'
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { CheckCircle2, ChevronLeft, Loader2, MapPin, ScanFace, Wifi, XCircle, type LucideIcon } from 'lucide-react'
+import { FaceCapture, type FaceSample } from './FaceCapture'
+
+type StepKind = 'wifi' | 'gps' | 'face'
+
+type PrecheckResult = {
+  gpsOk: boolean
+  wifiOk: boolean
+  nearestLocationName: string | null
+  distanceM: number | null
+}
+
+export type CheckInWizardResult = {
+  nearestLocationName: string | null
+  distanceM: number | null
+  radiusM: number | null
+  isWithinRadius: boolean
+  isIpVerified: boolean
+  ipMatchedLocationName: string | null
+  isSuccess: boolean
+  failReason: string | null
+  isFaceVerified: boolean
+  faceDistance: number | null
+}
+
+type Props = {
+  type: 'check_in' | 'check_out'
+  onCancel: () => void
+  onComplete: (result: CheckInWizardResult) => void
+}
+
+const STEP_META: Record<Exclude<StepKind, 'face'>, { title: string; Icon: LucideIcon }> = {
+  wifi: { title: 'Xác thực Wi-Fi', Icon: Wifi },
+  gps: { title: 'Xác thực vị trí', Icon: MapPin },
+}
+
+function getPosition(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (!('geolocation' in navigator)) {
+      reject(new Error('Trình duyệt không hỗ trợ định vị'))
+      return
+    }
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0,
+    })
+  })
+}
+
+function Shell({ title, onBack, children }: { title: string; onBack: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+      <div className="flex items-center gap-2 border-b border-gray-100 px-2 py-3">
+        <button type="button" onClick={onBack} className="p-1.5 text-gray-500 hover:text-gray-700">
+          <ChevronLeft size={22} />
+        </button>
+        <h1 className="flex-1 pr-8 text-center text-base font-bold text-gray-800">{title}</h1>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+/**
+ * Chấm công theo TỪNG BƯỚC riêng biệt (Wi-Fi văn phòng → vị trí GPS → khuôn
+ * mặt) thay vì gộp hết vào 1 lần bấm — mỗi bước hiện rõ kết quả trước khi
+ * cho qua bước tiếp theo. Bước nào không bị bắt buộc (admin tắt ở
+ * /admin/yeu-cau-cham-cong) thì tự động BỎ QUA, không hiện ra.
+ *
+ * Lưu ý: trình duyệt KHÔNG có API đọc tên mạng Wi-Fi thật — bước "Wi-Fi" ở
+ * đây kiểm tra bằng địa chỉ IP công cộng so với danh sách IP văn phòng đã
+ * cấu hình, không phải đọc SSID thật như app native.
+ */
+export function CheckInWizard({ type, onCancel, onComplete }: Props) {
+  const [phase, setPhase] = useState<'locating' | 'steps' | 'submitting' | 'error'>('locating')
+  const [fatalError, setFatalError] = useState('')
+  const [steps, setSteps] = useState<StepKind[] | null>(null)
+  const [stepIndex, setStepIndex] = useState(0)
+  const [precheck, setPrecheck] = useState<PrecheckResult | null>(null)
+  const positionRef = useRef<GeolocationPosition | null>(null)
+
+  const init = useCallback(async () => {
+    setPhase('locating')
+    setFatalError('')
+    try {
+      const [requirements, position] = await Promise.all([
+        fetch('/api/attendance/requirements').then((r) => r.json()),
+        getPosition(),
+      ])
+      positionRef.current = position
+
+      const precheckRes = await fetch('/api/attendance/precheck', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: position.coords.latitude, lng: position.coords.longitude }),
+      })
+      const precheckData = await precheckRes.json()
+      if (!precheckRes.ok) {
+        setFatalError(precheckData.error ?? 'Không kiểm tra được vị trí')
+        setPhase('error')
+        return
+      }
+      setPrecheck(precheckData)
+
+      const stepList: StepKind[] = []
+      if (requirements.requireWifi) stepList.push('wifi')
+      if (requirements.requireGps) stepList.push('gps')
+      if (requirements.requireFace) stepList.push('face')
+
+      if (stepList.length === 0) {
+        // Không bị bắt buộc điều kiện nào cả — chấm công thẳng luôn, không
+        // cần wizard hiện bước gì.
+        await submitFinal(position, undefined)
+        return
+      }
+
+      setStepIndex(0)
+      setSteps(stepList)
+      setPhase('steps')
+    } catch (err) {
+      const geoErr = err as GeolocationPositionError
+      if (typeof geoErr?.code === 'number') {
+        setFatalError(
+          geoErr.code === geoErr.PERMISSION_DENIED
+            ? 'Bạn cần cho phép truy cập vị trí để chấm công'
+            : 'Không lấy được vị trí GPS — thử lại ở nơi tín hiệu tốt hơn',
+        )
+      } else {
+        setFatalError(err instanceof Error ? err.message : 'Có lỗi xảy ra')
+      }
+      setPhase('error')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    init()
+  }, [init])
+
+  async function submitFinal(position: GeolocationPosition, faceEmbedding: number[] | undefined) {
+    setPhase('submitting')
+    try {
+      const res = await fetch('/api/attendance/check-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          type,
+          faceEmbedding,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setFatalError(data.error ?? 'Chấm công thất bại')
+        setPhase('error')
+        return
+      }
+      onComplete(data)
+    } catch (err) {
+      setFatalError(err instanceof Error ? err.message : 'Có lỗi xảy ra')
+      setPhase('error')
+    }
+  }
+
+  function handleFaceCapture(samples: FaceSample[]) {
+    if (!positionRef.current) return
+    submitFinal(positionRef.current, samples[0]?.embedding)
+  }
+
+  function advanceStep() {
+    if (!steps) return
+    const next = stepIndex + 1
+    if (next >= steps.length) {
+      // Hết danh sách bước mà không có bước khuôn mặt — chấm công luôn.
+      if (positionRef.current) submitFinal(positionRef.current, undefined)
+      return
+    }
+    setStepIndex(next)
+  }
+
+  if (phase === 'locating') {
+    return (
+      <Shell title={type === 'check_in' ? 'Chấm công vào' : 'Chấm công ra'} onBack={onCancel}>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-gray-500">
+          <Loader2 size={28} className="animate-spin" />
+          <p className="text-sm">Đang lấy vị trí GPS...</p>
+        </div>
+      </Shell>
+    )
+  }
+
+  if (phase === 'submitting') {
+    return (
+      <Shell title={type === 'check_in' ? 'Chấm công vào' : 'Chấm công ra'} onBack={onCancel}>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-gray-500">
+          <Loader2 size={28} className="animate-spin" />
+          <p className="text-sm">Đang gửi dữ liệu chấm công...</p>
+        </div>
+      </Shell>
+    )
+  }
+
+  if (phase === 'error') {
+    return (
+      <Shell title={type === 'check_in' ? 'Chấm công vào' : 'Chấm công ra'} onBack={onCancel}>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+          <XCircle size={40} className="text-red-500" />
+          <p className="text-sm text-gray-600">{fatalError}</p>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="mt-2 rounded-xl border border-gray-200 px-6 py-2 text-sm font-bold text-gray-600 hover:bg-gray-50"
+          >
+            Đóng
+          </button>
+        </div>
+      </Shell>
+    )
+  }
+
+  // phase === 'steps'
+  const currentKind = steps![stepIndex]
+
+  if (currentKind === 'face') {
+    return (
+      <FaceCapture
+        onCapture={handleFaceCapture}
+        onCancel={onCancel}
+        title={`Bước ${stepIndex + 1}/${steps!.length} — Khuôn mặt`}
+      />
+    )
+  }
+
+  const { title, Icon } = STEP_META[currentKind]
+  const stepOk = currentKind === 'wifi' ? precheck!.wifiOk : precheck!.gpsOk
+
+  return (
+    <Shell title={type === 'check_in' ? 'Chấm công vào' : 'Chấm công ra'} onBack={onCancel}>
+      <div className="flex items-center justify-between px-4 pt-4">
+        <h2 className="text-base font-bold text-gray-800">{title}</h2>
+        <span className="text-sm text-gray-400">
+          Bước <span className="font-bold text-gray-700">{stepIndex + 1}</span>/{steps!.length}
+        </span>
+      </div>
+
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6">
+        <Icon size={72} className={stepOk ? 'text-accent-500' : 'text-red-400'} />
+        <div className="flex items-center gap-2 text-sm font-medium">
+          {stepOk ? (
+            <>
+              <CheckCircle2 size={18} className="text-green-500" />
+              <span className="text-gray-700">Thành công</span>
+            </>
+          ) : (
+            <>
+              <XCircle size={18} className="text-red-500" />
+              <span className="text-gray-700">Thất bại</span>
+            </>
+          )}
+        </div>
+        <p className="text-center text-sm text-gray-500">
+          {currentKind === 'wifi'
+            ? stepOk
+              ? `Đúng mạng văn phòng${precheck!.nearestLocationName ? ` "${precheck!.nearestLocationName}"` : ''}`
+              : 'IP hiện tại không khớp mạng văn phòng nào'
+            : stepOk
+              ? `Trong phạm vi cho phép${precheck!.nearestLocationName ? ` (${precheck!.nearestLocationName})` : ''}${
+                  precheck!.distanceM != null ? ` — cách ${precheck!.distanceM}m` : ''
+                }`
+              : `Ngoài phạm vi cho phép${precheck!.distanceM != null ? ` — cách ${precheck!.distanceM}m` : ''}`}
+        </p>
+      </div>
+
+      <div className="px-4 pb-6">
+        {stepOk ? (
+          <button
+            type="button"
+            onClick={advanceStep}
+            className="w-full rounded-xl bg-brand-500 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-600"
+          >
+            Tiếp theo
+          </button>
+        ) : (
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-bold text-gray-600 transition-colors hover:bg-gray-50"
+            >
+              Đóng
+            </button>
+            <button
+              type="button"
+              onClick={init}
+              className="flex-1 rounded-xl bg-brand-500 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-600"
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
+      </div>
+    </Shell>
+  )
+}
