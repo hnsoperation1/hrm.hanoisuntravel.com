@@ -275,35 +275,37 @@ export function CheckInWizard({ type, onCancel, onComplete }: Props) {
                 }`
               : `Ngoài phạm vi cho phép${precheck!.distanceM != null ? ` — cách ${precheck!.distanceM}m` : ''}`}
         </p>
-      </div>
 
-      <div className="px-4 pb-6">
-        {stepOk ? (
-          <button
-            type="button"
-            onClick={advanceStep}
-            className="w-full rounded-xl bg-brand-500 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-600"
-          >
-            Tiếp theo
-          </button>
-        ) : (
-          <div className="flex gap-3">
+        {/* Nút bấm nằm NGAY dưới dòng kết quả — trước đây neo tận đáy màn
+            hình, cách xa nội dung, phải với tay quá xa mới bấm được. */}
+        <div className="w-full pt-2">
+          {stepOk ? (
             <button
               type="button"
-              onClick={onCancel}
-              className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-bold text-gray-600 transition-colors hover:bg-gray-50"
+              onClick={advanceStep}
+              className="w-full rounded-xl bg-brand-500 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-600"
             >
-              Đóng
+              Tiếp theo
             </button>
-            <button
-              type="button"
-              onClick={init}
-              className="flex-1 rounded-xl bg-brand-500 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-600"
-            >
-              Thử lại
-            </button>
-          </div>
-        )}
+          ) : (
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-bold text-gray-600 transition-colors hover:bg-gray-50"
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                onClick={init}
+                className="flex-1 rounded-xl bg-brand-500 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-600"
+              >
+                Thử lại
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </Shell>
   )

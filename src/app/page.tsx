@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, XCircle, Loader2, LogIn, LogOut, Wifi, ScanFace, CalendarCheck, Trash2 } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, LogIn, LogOut, Wifi, ScanFace, CalendarCheck, Trash2, Fingerprint } from 'lucide-react'
 import { CheckInWizard, type CheckInWizardResult } from '@/components/CheckInWizard'
 import { useAuth } from '@/contexts/auth'
 
@@ -364,14 +364,23 @@ export default function ChamCongPage() {
           Menu cũng có 1 lối vào chấm công song song (xem /menu), đây vẫn là
           lối tắt nhanh nhất khi đang đứng ở Trang chủ. */}
       {status && !status.dayComplete && (
-        <button
-          onClick={handleButtonClick}
-          className={`fixed bottom-[calc(env(safe-area-inset-bottom)+65px)] right-5 z-40 flex h-16 w-16 items-center justify-center rounded-full text-white shadow-lg ring-4 ring-white transition-colors ${
-            isCheckIn ? 'bg-brand-500 hover:bg-brand-600' : 'bg-accent-500 hover:bg-accent-600'
-          }`}
-        >
-          {isCheckIn ? <LogIn size={24} /> : <LogOut size={24} />}
-        </button>
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+110px)] right-5 z-40 h-16 w-16">
+          {/* Hiệu ứng toả sóng — vòng tròn cùng màu phóng to dần rồi mờ đi,
+              lặp lại, để bong bóng nổi bật hơn thay vì đứng yên 1 chỗ. */}
+          <span
+            className={`absolute inset-0 rounded-full animate-ping ${
+              isCheckIn ? 'bg-brand-400' : 'bg-accent-400'
+            } opacity-75`}
+          />
+          <button
+            onClick={handleButtonClick}
+            className={`relative flex h-16 w-16 items-center justify-center rounded-full text-white shadow-lg ring-4 ring-white transition-colors ${
+              isCheckIn ? 'bg-brand-500 hover:bg-brand-600' : 'bg-accent-500 hover:bg-accent-600'
+            }`}
+          >
+            <Fingerprint size={26} />
+          </button>
+        </div>
       )}
 
       {showWizard && status && (
