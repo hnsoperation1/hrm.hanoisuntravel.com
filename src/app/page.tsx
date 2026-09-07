@@ -211,7 +211,15 @@ export default function ChamCongPage() {
           </div>
         )}
 
-        {status?.dayComplete ? (
+        {!status ? (
+          // Chưa có dữ liệu thật (status vẫn null lúc đang tải) — hiện
+          // "đang tải", KHÔNG đoán isCheckIn để tránh nhấp nháy sai nút
+          // (mặc định isCheckIn=false khi status null nên trước đây có lúc
+          // hiện lộn "Kết thúc ca" một nhoáng trước khi có data thật).
+          <div className="w-full flex items-center justify-center py-4 rounded-2xl bg-gray-50">
+            <Loader2 size={18} className="animate-spin text-gray-400" />
+          </div>
+        ) : status.dayComplete ? (
           <div className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-sm font-semibold bg-green-50 text-green-700">
             <CalendarCheck size={18} />
             Đã hoàn tất chấm công hôm nay
