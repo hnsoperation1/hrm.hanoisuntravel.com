@@ -22,8 +22,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-4">
           <div className="font-black text-2xl tracking-wide">
+            <span className="text-brand-600">i</span>
             <span className="text-accent-500">HNS</span>
-            <span className="text-brand-600"> HRM</span>
           </div>
           <div className="flex items-center gap-1.5">
             {[0, 1, 2].map((i) => (

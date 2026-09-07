@@ -27,10 +27,10 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="font-black text-4xl tracking-wide">
+            <span className="text-brand-600">i</span>
             <span className="text-accent-500">HNS</span>
-            <span className="text-brand-600"> HRM</span>
           </div>
-          <p className="text-base text-gray-400 mt-2">Đăng nhập chấm công</p>
+          <p className="text-base text-gray-400 mt-2">Hanoi Sun Travel staff&apos;s app</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
