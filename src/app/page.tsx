@@ -32,6 +32,13 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 }
 
+function greeting() {
+  const hour = new Date().getHours()
+  if (hour < 11) return 'Chào buổi sáng'
+  if (hour < 18) return 'Chào buổi chiều'
+  return 'Chào buổi tối'
+}
+
 function todayIsoDate() {
   const d = new Date()
   const offset = d.getTimezoneOffset()
@@ -47,7 +54,6 @@ export default function ChamCongPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [resetUserId, setResetUserId] = useState('')
   const [status, setStatus] = useState<StatusResponse | null>(null)
-  const [loadingStatus, setLoadingStatus] = useState(true)
   const [lastResult, setLastResult] = useState<CheckInWizardResult | null>(null)
   const [lastSubmittedType, setLastSubmittedType] = useState<'check_in' | 'check_out' | null>(null)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
@@ -56,13 +62,8 @@ export default function ChamCongPage() {
   const [faceEnrolled, setFaceEnrolled] = useState<boolean | null>(null)
 
   const loadStatus = useCallback(async () => {
-    setLoadingStatus(true)
-    try {
-      const res = await fetch('/api/attendance/status')
-      if (res.ok) setStatus(await res.json())
-    } finally {
-      setLoadingStatus(false)
-    }
+    const res = await fetch('/api/attendance/status')
+    if (res.ok) setStatus(await res.json())
   }, [])
 
   useEffect(() => {
@@ -163,6 +164,14 @@ export default function ChamCongPage() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-10">
+      <div className="mb-6 px-1">
+        <p className="text-lg font-bold text-gray-800">
+          {greeting()}
+          {user?.full_name ? `, ${user.full_name}` : ''}!
+        </p>
+        <p className="text-sm text-gray-400">Chúc bạn một ngày làm việc hiệu quả!</p>
+      </div>
+
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
         <p className="text-sm text-gray-400 mb-1">
           {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
