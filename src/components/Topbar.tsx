@@ -38,7 +38,7 @@ export function Topbar() {
           {navItem('/', 'Chấm công', Clock)}
           {navItem('/dang-ky-khuon-mat', 'Khuôn mặt', ScanFace)}
           {isAdmin && navItem('/admin/dia-diem', 'Địa điểm', MapPin)}
-          {isAdmin && navItem('/admin/yeu-cau-cham-cong', 'Yêu cầu', SlidersHorizontal)}
+          {isAdmin && navItem('/admin/yeu-cau-cham-cong', 'Cài đặt', SlidersHorizontal)}
           {isAdmin && navItem('/admin/bao-cao', 'Báo cáo', ClipboardList)}
         </nav>
       </div>
