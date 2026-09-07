@@ -366,7 +366,7 @@ export default function ChamCongPage() {
       {status && !status.dayComplete && (
         <button
           onClick={handleButtonClick}
-          className={`fixed bottom-[calc(env(safe-area-inset-bottom)+88px)] right-5 z-40 flex h-16 w-16 items-center justify-center rounded-full text-white shadow-lg transition-colors ${
+          className={`fixed bottom-[calc(env(safe-area-inset-bottom)+65px)] right-5 z-40 flex h-16 w-16 items-center justify-center rounded-full text-white shadow-lg ring-4 ring-white transition-colors ${
             isCheckIn ? 'bg-brand-500 hover:bg-brand-600' : 'bg-accent-500 hover:bg-accent-600'
           }`}
         >
