@@ -39,6 +39,28 @@ function greeting() {
   return 'Chào buổi tối'
 }
 
+function LogRow({ log }: { log: AttendanceLog }) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="flex items-center gap-2">
+        {log.type === 'check_in' ? (
+          <LogIn size={14} className="text-brand-500" />
+        ) : (
+          <LogOut size={14} className="text-accent-500" />
+        )}
+        {log.type === 'check_in' ? 'Vào' : 'Ra'}
+        <span className={`flex items-center gap-0.5 text-xs ${log.is_within_radius ? 'text-green-600' : 'text-red-500'}`}>
+          <Wifi size={12} />
+          {log.distance_m != null ? `${Math.round(log.distance_m)}m` : '—'}
+        </span>
+        <ScanFace size={12} className={log.is_face_verified ? 'text-green-600' : 'text-red-500'} />
+        {!log.is_success && <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">thất bại</span>}
+      </span>
+      <span className="text-gray-500">{formatTime(log.created_at)}</span>
+    </div>
+  )
+}
+
 function todayIsoDate() {
   const d = new Date()
   const offset = d.getTimezoneOffset()
@@ -159,8 +181,9 @@ export default function ChamCongPage() {
   }
 
   const isCheckIn = status?.nextType === 'check_in'
-  const lastCheckInLog = status?.logs.filter((l) => l.type === 'check_in' && l.is_success).at(-1)
-  const lastCheckInTime = lastCheckInLog ? formatTime(lastCheckInLog.created_at) : null
+  const successCheckIn = status?.logs.find((l) => l.type === 'check_in' && l.is_success) ?? null
+  const successCheckOut = status?.logs.find((l) => l.type === 'check_out' && l.is_success) ?? null
+  const lastCheckInTime = successCheckIn ? formatTime(successCheckIn.created_at) : null
 
   return (
     <div className="max-w-md mx-auto px-4 py-10">
@@ -178,11 +201,31 @@ export default function ChamCongPage() {
         </p>
         <h1 className="text-lg font-bold text-gray-800 mb-6">Chấm công</h1>
 
-        {status?.dayComplete && (
+        {/* Dữ liệu chấm công vào/ra trong ngày — có gì hiện đó: chưa chấm
+            công thì trống hẳn, mới vào thì chỉ hiện dòng "Vào", xong cả 2
+            thì hiện đủ cả "Vào" lẫn "Ra". */}
+        {(successCheckIn || successCheckOut) && (
+          <div className="mb-6 space-y-2 rounded-xl bg-gray-50 p-3 text-left">
+            {successCheckIn && <LogRow log={successCheckIn} />}
+            {successCheckOut && <LogRow log={successCheckOut} />}
+          </div>
+        )}
+
+        {status?.dayComplete ? (
           <div className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-sm font-semibold bg-green-50 text-green-700">
             <CalendarCheck size={18} />
             Đã hoàn tất chấm công hôm nay
           </div>
+        ) : (
+          <button
+            onClick={handleButtonClick}
+            className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-base font-bold text-white transition-colors ${
+              isCheckIn ? 'bg-brand-500 hover:bg-brand-600' : 'bg-accent-500 hover:bg-accent-600'
+            }`}
+          >
+            {isCheckIn ? <LogIn size={18} /> : <LogOut size={18} />}
+            {isCheckIn ? 'Bắt đầu ca' : 'Kết thúc ca'}
+          </button>
         )}
 
         {/* Thất bại (thiếu GPS hoặc sai mạng lúc GỬI THẬT, dù wizard đã cho
@@ -225,29 +268,7 @@ export default function ChamCongPage() {
           <h2 className="text-sm font-bold text-gray-700 mb-3">Chấm công hôm nay</h2>
           <div className="space-y-2">
             {status.logs.map((log) => (
-              <div key={log.id} className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2">
-                  {log.type === 'check_in' ? (
-                    <LogIn size={14} className="text-brand-500" />
-                  ) : (
-                    <LogOut size={14} className="text-accent-500" />
-                  )}
-                  {log.type === 'check_in' ? 'Vào' : 'Ra'}
-                  <span
-                    className={`flex items-center gap-0.5 text-xs ${
-                      log.is_within_radius ? 'text-green-600' : 'text-red-500'
-                    }`}
-                  >
-                    <Wifi size={12} />
-                    {log.distance_m != null ? `${Math.round(log.distance_m)}m` : '—'}
-                  </span>
-                  <ScanFace size={12} className={log.is_face_verified ? 'text-green-600' : 'text-red-500'} />
-                  {!log.is_success && (
-                    <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">thất bại</span>
-                  )}
-                </span>
-                <span className="text-gray-500">{formatTime(log.created_at)}</span>
-              </div>
+              <LogRow key={log.id} log={log} />
             ))}
           </div>
         </div>
