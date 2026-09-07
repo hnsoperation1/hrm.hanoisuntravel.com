@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/auth'
-import { Topbar } from './Topbar'
+import { BottomNav, BOTTOM_NAV_PATHS } from './BottomNav'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -41,10 +41,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isLoginPage) return <>{children}</>
 
+  // Thanh điều hướng dưới đáy CHỈ hiện ở các màn cấp 1 (trong BOTTOM_NAV_PATHS)
+  // — giống app di động thật (MISA...): vào màn con thì thanh này tự biến
+  // mất, nhường chỗ cho header riêng (PageHeader) của màn con đó tự quyết
+  // định hiển thị gì, không phải khung cố định bất biến toàn app.
+  const showBottomNav = BOTTOM_NAV_PATHS.includes(pathname)
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
-      <Topbar />
-      <main className="flex-1 overflow-y-auto">{children}</main>
+      <main
+        className={`flex-1 overflow-y-auto ${showBottomNav ? 'pb-[calc(env(safe-area-inset-bottom)+64px)]' : ''}`}
+      >
+        {children}
+      </main>
+      {showBottomNav && <BottomNav />}
     </div>
   )
 }
