@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, LogIn, LogOut, Wifi, Send, Globe, ScanFace, MapPin } from 'lucide-react'
 import { useAuth } from '@/contexts/auth'
+import { PageHeader } from '@/components/PageHeader'
 
 type AttendanceRow = {
   id: string
@@ -37,9 +38,9 @@ export default function BaoCaoPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <h1 className="text-lg font-bold text-gray-800 mb-4">Báo cáo chấm công (500 dòng gần nhất)</h1>
-
+    <div>
+      <PageHeader title="Báo cáo chấm công" />
+      <div className="max-w-2xl mx-auto px-4 py-6">
       {loading ? (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 text-sm text-gray-400 flex items-center gap-2">
           <Loader2 size={14} className="animate-spin" /> Đang tải...
@@ -108,6 +109,7 @@ export default function BaoCaoPage() {
           ))}
         </div>
       )}
+      </div>
     </div>
   )
 }

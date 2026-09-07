@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronUp, Loader2, MapPin, ScanFace, Wifi } from 'lucide-react'
 import { useAuth } from '@/contexts/auth'
+import { PageHeader } from '@/components/PageHeader'
 
 type Employee = {
   id: string
@@ -116,8 +117,9 @@ export default function YeuCauChamCongPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-lg font-bold text-gray-800 mb-1">Yêu cầu chấm công theo nhân viên</h1>
+    <div>
+      <PageHeader title="Yêu cầu chấm công theo nhân viên" />
+      <div className="max-w-3xl mx-auto px-4 py-6">
       <p className="text-sm text-gray-500 mb-6">
         Bỏ tick 1 điều kiện = nhân viên đó không cần đạt điều kiện đó mới được tính chấm công thành công. Gán địa
         điểm = luôn tính theo đúng địa điểm đó, không tự động lấy địa điểm gần nhất nữa.
@@ -287,6 +289,7 @@ export default function YeuCauChamCongPage() {
           ))}
         </div>
       )}
+      </div>
     </div>
   )
 }

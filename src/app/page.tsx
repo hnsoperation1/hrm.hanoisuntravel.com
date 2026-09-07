@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { CheckCircle2, XCircle, Loader2, LogIn, LogOut, Wifi, ScanFace, CalendarCheck, Trash2 } from 'lucide-react'
 import { FaceCapture, type FaceSample } from '@/components/FaceCapture'
 import { useAuth } from '@/contexts/auth'
@@ -81,6 +82,7 @@ export default function ChamCongPage() {
   const [pendingPosition, setPendingPosition] = useState<GeolocationPosition | null>(null)
   const [showFaceCapture, setShowFaceCapture] = useState(false)
   const [showConfirmOut, setShowConfirmOut] = useState(false)
+  const [faceEnrolled, setFaceEnrolled] = useState<boolean | null>(null)
 
   const loadStatus = useCallback(async () => {
     setLoadingStatus(true)
@@ -95,6 +97,17 @@ export default function ChamCongPage() {
   useEffect(() => {
     loadStatus()
   }, [loadStatus])
+
+  // Nhắc đăng ký khuôn mặt NGAY tại màn chấm công nếu chưa có — trước đây
+  // phải tự vào Menu mới thấy, nhiều khả năng nhân viên không biết là thiếu
+  // bước này cho tới khi chấm công thất bại vì "chưa đăng ký khuôn mặt".
+  useEffect(() => {
+    fetch('/api/face/enroll')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setFaceEnrolled(data.enrolled)
+      })
+  }, [])
 
   useEffect(() => {
     if (!isAdmin) return
@@ -305,6 +318,25 @@ export default function ChamCongPage() {
           </div>
         )}
       </div>
+
+      {faceEnrolled === false && (
+        <div className="mt-6 rounded-2xl border border-dashed border-accent-300 bg-accent-50/60 p-5 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-accent-100">
+            <ScanFace size={22} className="text-accent-500" />
+          </div>
+          <p className="mb-1 text-sm font-bold text-gray-800">Bạn chưa đăng ký khuôn mặt</p>
+          <p className="mb-4 text-xs text-gray-500">
+            Cần đăng ký khuôn mặt trước để hệ thống xác thực đúng người mỗi lần chấm công.
+          </p>
+          <Link
+            href="/dang-ky-khuon-mat"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-accent-500 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-600"
+          >
+            <ScanFace size={14} />
+            Đăng ký khuôn mặt ngay
+          </Link>
+        </div>
+      )}
 
       {status && status.logs.length > 0 && (
         <div className="mt-6 bg-white rounded-2xl border border-gray-200 shadow-sm p-5">

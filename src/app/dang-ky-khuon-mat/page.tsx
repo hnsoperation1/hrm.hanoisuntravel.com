@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { ScanFace, CheckCircle2, Loader2 } from 'lucide-react'
 import { FaceCapture, type FaceSample } from '@/components/FaceCapture'
+import { PageHeader } from '@/components/PageHeader'
 
 export default function DangKyKhuonMatPage() {
   const [enrolled, setEnrolled] = useState<boolean | null>(null)
@@ -46,12 +47,13 @@ export default function DangKyKhuonMatPage() {
   }
 
   return (
-    <div className="max-w-md mx-auto px-4 py-10">
+    <div>
+      <PageHeader title="Đăng ký khuôn mặt" />
+      <div className="max-w-md mx-auto px-4 py-8">
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-50">
           <ScanFace size={26} className="text-brand-500" />
         </div>
-        <h1 className="text-lg font-bold text-gray-800 mb-6">Đăng ký khuôn mặt</h1>
 
         {enrolled && (
           <div className="mb-4 flex items-center justify-center gap-2 text-sm text-green-700 bg-green-50 rounded-xl p-3">
@@ -80,6 +82,7 @@ export default function DangKyKhuonMatPage() {
           title="Chụp 5 ảnh để đăng ký"
         />
       )}
+      </div>
     </div>
   )
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, MapPin, Plus, Trash2, LocateFixed, Pencil, X, Check, Wifi } from 'lucide-react'
 import { useAuth } from '@/contexts/auth'
+import { PageHeader } from '@/components/PageHeader'
 
 type WorkLocation = {
   id: string
@@ -173,9 +174,9 @@ export default function DiaDiemPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-      <h1 className="text-lg font-bold text-gray-800">Địa điểm chấm công</h1>
-
+    <div>
+      <PageHeader title="Địa điểm chấm công" />
+      <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
       <form onSubmit={handleAdd} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <input
@@ -348,6 +349,7 @@ export default function DiaDiemPage() {
             ),
           )
         )}
+      </div>
       </div>
     </div>
   )
