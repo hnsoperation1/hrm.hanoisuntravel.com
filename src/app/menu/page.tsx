@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ClipboardList, Fingerprint, type LucideIcon } from 'lucide-react'
+import { ClipboardList, Fingerprint, Trash2, type LucideIcon } from 'lucide-react'
 import { useAuth } from '@/contexts/auth'
 
 function Tile({ href, label, Icon, color }: { href: string; label: string; Icon: LucideIcon; color: string }) {
@@ -30,6 +30,9 @@ export default function MenuPage() {
       <div className="grid grid-cols-4 gap-4">
         <Tile href="/" label="Chấm công" Icon={Fingerprint} color="bg-brand-500" />
         {isAdmin && <Tile href="/admin/bao-cao" label="Báo cáo" Icon={ClipboardList} color="bg-accent-500" />}
+        {isAdmin && (
+          <Tile href="/admin/quan-tri-cham-cong" label="Quản trị chấm công" Icon={Trash2} color="bg-red-500" />
+        )}
       </div>
     </div>
   )

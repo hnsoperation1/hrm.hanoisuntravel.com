@@ -2,34 +2,16 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, XCircle, Loader2, LogIn, LogOut, Wifi, ScanFace, CalendarCheck, Trash2 } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, LogIn, LogOut, Wifi, ScanFace } from 'lucide-react'
 import { CheckInWizard, type CheckInWizardResult } from '@/components/CheckInWizard'
 import { DraggableCheckInBubble } from '@/components/DraggableCheckInBubble'
+import { LogRow, formatTime, formatDayHeading, groupLogsByDay, type AttendanceLog } from '@/components/AttendanceLogRow'
 import { useAuth } from '@/contexts/auth'
-
-type AttendanceLog = {
-  id: string
-  type: 'check_in' | 'check_out'
-  created_at: string
-  is_within_radius: boolean
-  is_ip_verified: boolean
-  is_face_verified: boolean
-  is_success: boolean
-  distance_m: number | null
-  face_distance: number | null
-  hrm_work_locations: { name: string } | null
-}
 
 type StatusResponse = {
   logs: AttendanceLog[]
   nextType: 'check_in' | 'check_out'
   dayComplete: boolean
-}
-
-type Employee = { id: string; full_name: string; email: string }
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 }
 
 function greeting() {
@@ -39,42 +21,8 @@ function greeting() {
   return 'Chào buổi tối'
 }
 
-function LogRow({ log }: { log: AttendanceLog }) {
-  return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="flex items-center gap-2">
-        {log.type === 'check_in' ? (
-          <LogIn size={14} className="text-brand-500" />
-        ) : (
-          <LogOut size={14} className="text-accent-500" />
-        )}
-        {log.type === 'check_in' ? 'Vào' : 'Ra'}
-        <span className={`flex items-center gap-0.5 text-xs ${log.is_within_radius ? 'text-green-600' : 'text-red-500'}`}>
-          <Wifi size={12} />
-          {log.distance_m != null ? `${Math.round(log.distance_m)}m` : '—'}
-        </span>
-        <ScanFace size={12} className={log.is_face_verified ? 'text-green-600' : 'text-red-500'} />
-        {!log.is_success && <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">thất bại</span>}
-      </span>
-      <span className="text-gray-500">{formatTime(log.created_at)}</span>
-    </div>
-  )
-}
-
-function todayIsoDate() {
-  const d = new Date()
-  const offset = d.getTimezoneOffset()
-  return new Date(d.getTime() - offset * 60000).toISOString().slice(0, 10)
-}
-
 export default function ChamCongPage() {
   const { user } = useAuth()
-  const isAdmin = user?.is_super_admin || user?.is_boss
-  const [resetDate, setResetDate] = useState(todayIsoDate())
-  const [resetting, setResetting] = useState(false)
-  const [resetMsg, setResetMsg] = useState('')
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [resetUserId, setResetUserId] = useState('')
   const [status, setStatus] = useState<StatusResponse | null>(null)
   const [lastResult, setLastResult] = useState<CheckInWizardResult | null>(null)
   const [lastSubmittedType, setLastSubmittedType] = useState<'check_in' | 'check_out' | null>(null)
@@ -82,15 +30,22 @@ export default function ChamCongPage() {
   const [showWizard, setShowWizard] = useState(false)
   const [showConfirmOut, setShowConfirmOut] = useState(false)
   const [faceEnrolled, setFaceEnrolled] = useState<boolean | null>(null)
+  const [recentLogs, setRecentLogs] = useState<AttendanceLog[] | null>(null)
 
   const loadStatus = useCallback(async () => {
     const res = await fetch('/api/attendance/status')
     if (res.ok) setStatus(await res.json())
   }, [])
 
+  const loadRecentLogs = useCallback(async () => {
+    const res = await fetch('/api/attendance/recent?days=3')
+    if (res.ok) setRecentLogs((await res.json()).logs ?? [])
+  }, [])
+
   useEffect(() => {
     loadStatus()
-  }, [loadStatus])
+    loadRecentLogs()
+  }, [loadStatus, loadRecentLogs])
 
   // Nhắc đăng ký khuôn mặt NGAY tại màn chấm công nếu chưa có — trước đây
   // phải tự vào Menu mới thấy, nhiều khả năng nhân viên không biết là thiếu
@@ -102,15 +57,6 @@ export default function ChamCongPage() {
         if (data) setFaceEnrolled(data.enrolled)
       })
   }, [])
-
-  useEffect(() => {
-    if (!isAdmin) return
-    fetch('/api/admin/employees')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data) setEmployees(data.employees)
-      })
-  }, [isAdmin])
 
   // Tự đóng modal thành công sau vài giây, không bắt người dùng phải bấm tay.
   useEffect(() => {
@@ -136,7 +82,7 @@ export default function ChamCongPage() {
     // Luôn làm mới trạng thái dù thành công hay bị server từ chối (vd đã đủ
     // 1 vào + 1 ra) — tránh giao diện hiện nút cũ dù server đã coi ngày đó
     // là xong, dễ bấm thêm vô ích.
-    await loadStatus()
+    await Promise.all([loadStatus(), loadRecentLogs()])
   }
 
   // Chấm công vào thì bấm là chạy luôn; chấm công RA cần xác nhận lại trước
@@ -156,30 +102,6 @@ export default function ChamCongPage() {
     openWizard()
   }
 
-  async function handleResetDay() {
-    const target = resetUserId ? employees.find((e) => e.id === resetUserId) : null
-    const targetLabel = target ? `${target.full_name} (${target.email})` : 'CHÍNH BẠN'
-    if (!confirm(`Xoá toàn bộ chấm công của ${targetLabel} ngày ${resetDate}? Không hoàn tác được.`)) return
-    setResetting(true)
-    setResetMsg('')
-    try {
-      const res = await fetch('/api/admin/attendance/reset-day', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: resetDate, userId: resetUserId || undefined }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setResetMsg(data.error ?? 'Không xoá được')
-        return
-      }
-      setResetMsg(`Đã xoá ${data.deleted} log`)
-      await loadStatus()
-    } finally {
-      setResetting(false)
-    }
-  }
-
   const isCheckIn = status?.nextType === 'check_in'
   const successCheckIn = status?.logs.find((l) => l.type === 'check_in' && l.is_success) ?? null
   const successCheckOut = status?.logs.find((l) => l.type === 'check_out' && l.is_success) ?? null
@@ -195,61 +117,69 @@ export default function ChamCongPage() {
         <p className="text-sm text-gray-400">Chúc bạn một ngày làm việc hiệu quả!</p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
-        <p className="text-sm text-gray-400 mb-1">
-          {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
-        </p>
-        <h1 className="text-lg font-bold text-gray-800 mb-6">Chấm công</h1>
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <h2 className="border-b border-gray-100 px-5 py-3 text-sm font-bold text-gray-700">Chấm công hôm nay</h2>
 
-        {/* Dữ liệu chấm công vào/ra trong ngày — có gì hiện đó: chưa chấm
-            công thì trống hẳn, mới vào thì chỉ hiện dòng "Vào", xong cả 2
-            thì hiện đủ cả "Vào" lẫn "Ra". */}
-        {(successCheckIn || successCheckOut) && (
-          <div className="mb-6 space-y-2 rounded-xl bg-gray-50 p-3 text-left">
-            {successCheckIn && <LogRow log={successCheckIn} />}
-            {successCheckOut && <LogRow log={successCheckOut} />}
-          </div>
-        )}
+        <div className="p-8 text-center">
+          <p className="text-sm text-gray-400 mb-4">
+            {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
+          </p>
 
-        {!status ? (
-          // Chưa có dữ liệu thật (status vẫn null lúc đang tải) — hiện
-          // "đang tải", KHÔNG đoán isCheckIn để tránh nhấp nháy sai nút
-          // (mặc định isCheckIn=false khi status null nên trước đây có lúc
-          // hiện lộn "Kết thúc ca" một nhoáng trước khi có data thật).
-          <div className="w-full flex items-center justify-center py-4 rounded-2xl bg-gray-50">
-            <Loader2 size={18} className="animate-spin text-gray-400" />
-          </div>
-        ) : status.dayComplete ? (
-          <div className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-sm font-semibold bg-green-50 text-green-700">
-            <CalendarCheck size={18} />
-            Đã hoàn tất chấm công hôm nay
-          </div>
-        ) : (
-          <button
-            onClick={handleButtonClick}
-            className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-base font-bold text-white transition-colors ${
-              isCheckIn ? 'bg-brand-500 hover:bg-brand-600' : 'bg-accent-500 hover:bg-accent-600'
-            }`}
-          >
-            {isCheckIn ? <LogIn size={18} /> : <LogOut size={18} />}
-            {isCheckIn ? 'Bắt đầu ca' : 'Kết thúc ca'}
-          </button>
-        )}
+          {/* Checkin/checkout trong ngày — có gì hiện đó: chưa chấm công thì
+              trống hẳn, mới vào thì chỉ hiện "Checkin", xong cả 2 thì hiện
+              đủ "Checkin" lẫn "Checkout". */}
+          {(successCheckIn || successCheckOut) && (
+            <div className="mb-6 space-y-1 text-left">
+              {successCheckIn && (
+                <p className="text-sm text-gray-700">
+                  <span className="font-semibold">Checkin:</span> {formatTime(successCheckIn.created_at)}
+                </p>
+              )}
+              {successCheckOut && (
+                <p className="text-sm text-gray-700">
+                  <span className="font-semibold">Checkout:</span> {formatTime(successCheckOut.created_at)}
+                </p>
+              )}
+            </div>
+          )}
 
-        {/* Thất bại (thiếu GPS hoặc sai mạng lúc GỬI THẬT, dù wizard đã cho
-            qua từng bước) hiện banner cảnh báo tại chỗ — chỉ trường hợp
-            THÀNH CÔNG mới bật modal riêng bên dưới. */}
-        {lastResult && !lastResult.isSuccess && (
-          <div className="mt-4 flex items-start gap-2 text-left text-sm text-red-600 bg-red-50 rounded-xl p-3">
-            <XCircle size={16} className="shrink-0 mt-0.5" />
-            <span>
-              Chấm công KHÔNG hợp lệ — {lastResult.failReason ?? 'không đạt điều kiện'}.
-              {lastResult.nearestLocationName &&
-                ` (cách "${lastResult.nearestLocationName}" ${lastResult.distanceM}m)`}{' '}
-              Lượt này vẫn được lưu lại để quản lý xem xét.
-            </span>
-          </div>
-        )}
+          {!status ? (
+            // Chưa có dữ liệu thật (status vẫn null lúc đang tải) — hiện
+            // "đang tải", KHÔNG đoán isCheckIn để tránh nhấp nháy sai nút
+            // (mặc định isCheckIn=false khi status null nên trước đây có lúc
+            // hiện lộn "Kết thúc ca" một nhoáng trước khi có data thật).
+            <div className="w-full flex items-center justify-center py-4 rounded-2xl bg-gray-50">
+              <Loader2 size={18} className="animate-spin text-gray-400" />
+            </div>
+          ) : (
+            !status.dayComplete && (
+              <button
+                onClick={handleButtonClick}
+                className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-base font-bold text-white transition-colors ${
+                  isCheckIn ? 'bg-brand-500 hover:bg-brand-600' : 'bg-accent-500 hover:bg-accent-600'
+                }`}
+              >
+                {isCheckIn ? <LogIn size={18} /> : <LogOut size={18} />}
+                {isCheckIn ? 'Bắt đầu ca' : 'Kết thúc ca'}
+              </button>
+            )
+          )}
+
+          {/* Thất bại (thiếu GPS hoặc sai mạng lúc GỬI THẬT, dù wizard đã cho
+              qua từng bước) hiện banner cảnh báo tại chỗ — chỉ trường hợp
+              THÀNH CÔNG mới bật modal riêng bên dưới. */}
+          {lastResult && !lastResult.isSuccess && (
+            <div className="mt-4 flex items-start gap-2 text-left text-sm text-red-600 bg-red-50 rounded-xl p-3">
+              <XCircle size={16} className="shrink-0 mt-0.5" />
+              <span>
+                Chấm công KHÔNG hợp lệ — {lastResult.failReason ?? 'không đạt điều kiện'}.
+                {lastResult.nearestLocationName &&
+                  ` (cách "${lastResult.nearestLocationName}" ${lastResult.distanceM}m)`}{' '}
+                Lượt này vẫn được lưu lại để quản lý xem xét.
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {faceEnrolled === false && (
@@ -271,55 +201,42 @@ export default function ChamCongPage() {
         </div>
       )}
 
-      {status && status.logs.length > 0 && (
-        <div className="mt-6 bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-          <h2 className="text-sm font-bold text-gray-700 mb-3">Chấm công hôm nay</h2>
-          <div className="space-y-2">
-            {status.logs.map((log) => (
-              <LogRow key={log.id} log={log} />
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <h2 className="border-b border-gray-100 px-5 py-3 text-sm font-bold text-gray-700">Dữ liệu chấm công</h2>
 
-      {isAdmin && (
-        <div className="mt-6 rounded-2xl border border-dashed border-amber-300 bg-amber-50/60 p-4">
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-amber-700">Công cụ quản trị — xoá chấm công</p>
-          <p className="mb-3 text-xs text-amber-700">
-            Xoá toàn bộ chấm công của 1 nhân viên trong 1 ngày (mặc định chính bạn) — dùng để test hoặc sửa dữ liệu lỗi.
-            Không hoàn tác được.
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={resetUserId}
-              onChange={(e) => setResetUserId(e.target.value)}
-              className="rounded-lg border border-amber-300 bg-white px-2 py-1.5 text-sm min-w-[160px]"
-            >
-              <option value="">Chính tôi</option>
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.full_name} ({emp.email})
-                </option>
+        <div className="p-5">
+          {recentLogs === null ? (
+            <div className="flex justify-center py-4">
+              <Loader2 size={16} className="animate-spin text-gray-400" />
+            </div>
+          ) : recentLogs.length === 0 ? (
+            <p className="text-sm text-gray-400">Chưa có dữ liệu chấm công.</p>
+          ) : (
+            <div className="space-y-4">
+              {groupLogsByDay(recentLogs).map(([day, dayLogs]) => (
+                <div key={day}>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">{formatDayHeading(day)}</p>
+                  <div className="space-y-2">
+                    {dayLogs.map((log) => (
+                      <LogRow key={log.id} log={log} />
+                    ))}
+                  </div>
+                </div>
               ))}
-            </select>
-            <input
-              type="date"
-              value={resetDate}
-              onChange={(e) => setResetDate(e.target.value)}
-              className="rounded-lg border border-amber-300 bg-white px-2 py-1.5 text-sm"
-            />
-            <button
-              onClick={handleResetDay}
-              disabled={resetting}
-              className="flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-60"
-            >
-              {resetting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-              Xoá dữ liệu ngày này
-            </button>
-          </div>
-          {resetMsg && <p className="mt-2 text-xs text-amber-800">{resetMsg}</p>}
+            </div>
+          )}
+
+          {/* Đang cân nhắc thiết kế đầy đủ cho phần này — tạm thời chỉ hiện
+              3 ngày gần nhất kèm nút mở trang xem toàn bộ lịch sử. */}
+          <Link
+            href="/lich-su-cham-cong"
+            className="mt-4 block text-center text-sm font-bold text-brand-600 hover:underline"
+          >
+            Xem thêm
+          </Link>
         </div>
-      )}
+      </div>
+
 
       {/* Modal chấm công thành công */}
       {showSuccessModal && lastResult?.isSuccess && (
