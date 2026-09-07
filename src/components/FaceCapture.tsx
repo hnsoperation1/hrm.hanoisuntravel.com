@@ -213,7 +213,7 @@ export function FaceCapture({
         <div className="flex items-center justify-center gap-2 text-sm text-gray-600 min-h-[20px]">
           {status === 'loading' && (
             <>
-              <Loader2 size={15} className="animate-spin" /> Đang tải model nhận diện...
+              <Loader2 size={15} className="animate-spin" /> Đang chuẩn bị nhận diện khuôn mặt...
             </>
           )}
           {status === 'searching' && (
