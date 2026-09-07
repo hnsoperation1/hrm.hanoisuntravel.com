@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, LayoutGrid, Menu as MenuIcon } from 'lucide-react'
+import { Bell, Home, LayoutGrid, Menu as MenuIcon } from 'lucide-react'
 import clsx from 'clsx'
 
 // Danh sách đường dẫn "màn cấp 1" (top-level) — vào thẳng từ thanh điều
@@ -12,18 +12,17 @@ import clsx from 'clsx'
 // riêng của màn con đó — không phải khung cố định bất biến toàn app). Các
 // tính năng/cài đặt khác (khuôn mặt, địa điểm, yêu cầu chấm công, báo cáo)
 // đều là màn con, vào từ /menu hoặc /cai-dat.
-export const BOTTOM_NAV_PATHS = ['/', '/menu', '/cai-dat']
+export const BOTTOM_NAV_PATHS = ['/', '/menu', '/thong-bao', '/cai-dat']
 
 const items = [
   { href: '/', label: 'Trang chủ', Icon: Home },
   { href: '/menu', label: 'Menu', Icon: LayoutGrid },
+  { href: '/thong-bao', label: 'Thông báo', Icon: Bell },
   { href: '/cai-dat', label: 'Cài đặt', Icon: MenuIcon },
 ]
 
-// Thanh điều hướng dưới đáy, kiểu app di động — cao hơn hẳn bản cũ (giống
-// MISA: icon nằm trong khối bo tròn riêng, tab đang chọn có nền màu), chỉ
-// còn đúng 3 mục cố định — mọi tính năng/cài đặt khác gộp vào trong Menu và
-// Cài đặt thay vì liệt kê hết ra thanh này.
+// Thanh điều hướng dưới đáy, nền trắng kiểu Facebook — icon/chữ mặc định
+// màu đen, tab đang chọn (hoặc hover chuột trên PC) chuyển màu cam + đậm lên.
 export function BottomNav() {
   const pathname = usePathname()
 
@@ -32,18 +31,16 @@ export function BottomNav() {
       {items.map(({ href, label, Icon }) => {
         const active = pathname === href
         return (
-          <Link key={href} href={href} className="flex flex-1 flex-col items-center justify-center gap-1 py-3">
-            <div
-              className={clsx(
-                'flex h-10 w-10 items-center justify-center rounded-2xl transition-colors',
-                active ? 'bg-accent-50 text-accent-500' : 'text-gray-400',
-              )}
-            >
-              <Icon size={22} className="shrink-0" />
-            </div>
-            <span className={clsx('text-[11px] font-medium', active ? 'text-accent-500' : 'text-gray-400')}>
-              {label}
-            </span>
+          <Link
+            key={href}
+            href={href}
+            className={clsx(
+              'flex flex-1 flex-col items-center justify-center gap-0.5 py-3 transition-colors',
+              active ? 'text-accent-500' : 'text-gray-900 hover:text-accent-500',
+            )}
+          >
+            <Icon size={22} strokeWidth={active ? 2.5 : 2} className="shrink-0" />
+            <span className={clsx('text-[11px] transition-all', active ? 'font-bold' : 'font-medium')}>{label}</span>
           </Link>
         )
       })}
