@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Fingerprint, LayoutGrid, Menu as MenuIcon } from 'lucide-react'
+import { Home, LayoutGrid, Menu as MenuIcon } from 'lucide-react'
 import clsx from 'clsx'
 
 // Danh sách đường dẫn "màn cấp 1" (top-level) — vào thẳng từ thanh điều
@@ -15,7 +15,7 @@ import clsx from 'clsx'
 export const BOTTOM_NAV_PATHS = ['/', '/menu', '/cai-dat']
 
 const items = [
-  { href: '/', label: 'Chấm công', Icon: Fingerprint },
+  { href: '/', label: 'Trang chủ', Icon: Home },
   { href: '/menu', label: 'Menu', Icon: LayoutGrid },
   { href: '/cai-dat', label: 'Cài đặt', Icon: MenuIcon },
 ]

@@ -168,22 +168,11 @@ export default function ChamCongPage() {
         </p>
         <h1 className="text-lg font-bold text-gray-800 mb-6">Chấm công</h1>
 
-        {status?.dayComplete ? (
+        {status?.dayComplete && (
           <div className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-sm font-semibold bg-green-50 text-green-700">
             <CalendarCheck size={18} />
             Đã hoàn tất chấm công hôm nay
           </div>
-        ) : (
-          <button
-            onClick={handleButtonClick}
-            disabled={loadingStatus}
-            className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-base font-bold text-white transition-colors disabled:opacity-60 ${
-              isCheckIn ? 'bg-brand-500 hover:bg-brand-600' : 'bg-accent-500 hover:bg-accent-600'
-            }`}
-          >
-            {isCheckIn ? <LogIn size={18} /> : <LogOut size={18} />}
-            {isCheckIn ? 'Chấm công vào' : 'Chấm công ra'}
-          </button>
         )}
 
         {/* Thất bại (thiếu GPS hoặc sai mạng lúc GỬI THẬT, dù wizard đã cho
@@ -368,6 +357,21 @@ export default function ChamCongPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Nút chấm công dạng bong bóng nổi — chỉ hiện ở Trang chủ (không phải
+          khung cố định toàn app), thay cho nút to nằm trong card như trước.
+          Menu cũng có 1 lối vào chấm công song song (xem /menu), đây vẫn là
+          lối tắt nhanh nhất khi đang đứng ở Trang chủ. */}
+      {status && !status.dayComplete && (
+        <button
+          onClick={handleButtonClick}
+          className={`fixed bottom-[calc(env(safe-area-inset-bottom)+88px)] right-5 z-40 flex h-16 w-16 items-center justify-center rounded-full text-white shadow-lg transition-colors ${
+            isCheckIn ? 'bg-brand-500 hover:bg-brand-600' : 'bg-accent-500 hover:bg-accent-600'
+          }`}
+        >
+          {isCheckIn ? <LogIn size={24} /> : <LogOut size={24} />}
+        </button>
       )}
 
       {showWizard && status && (

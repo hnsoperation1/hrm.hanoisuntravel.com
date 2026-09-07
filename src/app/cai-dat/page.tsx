@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronRight, LogOut, MapPin, SlidersHorizontal, type LucideIcon } from 'lucide-react'
+import { ChevronRight, LogOut, MapPin, ScanFace, SlidersHorizontal, type LucideIcon } from 'lucide-react'
 import { useAuth } from '@/contexts/auth'
 
 function Row({ href, label, Icon }: { href: string; label: string; Icon: LucideIcon }) {
@@ -25,6 +25,10 @@ export default function CaiDatPage() {
   return (
     <div className="mx-auto max-w-md space-y-6 px-4 py-6">
       <h1 className="text-lg font-bold text-gray-800">Cài đặt</h1>
+
+      <div className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <Row href="/dang-ky-khuon-mat" label="Khuôn mặt" Icon={ScanFace} />
+      </div>
 
       {isAdmin && (
         <div className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
