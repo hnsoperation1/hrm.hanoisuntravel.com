@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, XCircle, Loader2, LogIn, LogOut, Wifi, ScanFace } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, LogIn, LogOut, MapPin, Wifi, ScanFace } from 'lucide-react'
 import { CheckInWizard, type CheckInWizardResult } from '@/components/CheckInWizard'
 import { LogRow, formatTime, formatDayHeading, groupLogsByDay, type AttendanceLog } from '@/components/AttendanceLogRow'
 import { useAuth } from '@/contexts/auth'
@@ -257,6 +257,12 @@ export default function ChamCongPage() {
               {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
               {lastResult.nearestLocationName ? ` · ${lastResult.nearestLocationName}` : ''}
             </p>
+            {lastResult.isWithinRadius && (
+              <div className="mb-2 flex items-center justify-center gap-1.5 rounded-xl bg-brand-50 p-2 text-xs text-brand-600">
+                <MapPin size={13} />
+                Đúng vị trí{lastResult.nearestLocationName ? ` "${lastResult.nearestLocationName}"` : ''}
+              </div>
+            )}
             {lastResult.isIpVerified && (
               <div className="mb-2 flex items-center justify-center gap-1.5 rounded-xl bg-brand-50 p-2 text-xs text-brand-600">
                 <Wifi size={13} />
