@@ -13,9 +13,11 @@ type Employee = {
   require_wifi: boolean
   require_face: boolean
   location_id: string | null
+  shift_id: string | null
 }
 
 type Location = { id: string; name: string }
+type Shift = { id: string; name: string; is_default: boolean }
 
 type FaceEnrollment =
   | { id: string; enrolled: false }
@@ -25,6 +27,7 @@ export default function YeuCauChamCongPage() {
   const { user, loading: authLoading } = useAuth()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [locations, setLocations] = useState<Location[]>([])
+  const [shifts, setShifts] = useState<Shift[]>([])
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [faceData, setFaceData] = useState<Map<string, FaceEnrollment>>(new Map())
@@ -42,6 +45,7 @@ export default function YeuCauChamCongPage() {
       const data = await res.json()
       setEmployees(data.employees)
       setLocations(data.locations)
+      setShifts(data.shifts)
     }
     setLoading(false)
   }
@@ -218,6 +222,19 @@ export default function YeuCauChamCongPage() {
                 {locations.map((loc) => (
                   <option key={loc.id} value={loc.id}>
                     Luôn tính theo: {loc.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={emp.shift_id ?? ''}
+                onChange={(e) => saveField(emp, { shift_id: e.target.value || null })}
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 mt-2 focus:outline-none focus:ring-2 focus:ring-brand-400"
+              >
+                <option value="">Ca mặc định{shifts.find((s) => s.is_default) ? ` (${shifts.find((s) => s.is_default)!.name})` : ''}</option>
+                {shifts.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    Ca: {s.name}
                   </option>
                 ))}
               </select>

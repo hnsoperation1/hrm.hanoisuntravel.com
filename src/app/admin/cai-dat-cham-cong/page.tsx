@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronRight, MapPin, MessageSquareText, SlidersHorizontal, type LucideIcon } from 'lucide-react'
+import { ChevronRight, Clock, MapPin, MessageSquareText, SlidersHorizontal, type LucideIcon } from 'lucide-react'
 import { useAuth } from '@/contexts/auth'
 import { PageHeader } from '@/components/PageHeader'
 
@@ -33,6 +33,7 @@ export default function CaiDatChamCongPage() {
       <div className="mx-auto max-w-md px-4 py-6">
         <div className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <Row href="/admin/dia-diem" label="Địa điểm chấm công" Icon={MapPin} />
+          <Row href="/admin/ca-lam-viec" label="Ca làm việc" Icon={Clock} />
           <Row href="/admin/yeu-cau-cham-cong" label="Yêu cầu chấm công theo nhân viên" Icon={SlidersHorizontal} />
           <Row href="/admin/duyet-don-tu" label="Duyệt đơn từ" Icon={MessageSquareText} />
         </div>

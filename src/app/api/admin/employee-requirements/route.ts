@@ -8,14 +8,15 @@ export async function GET() {
   const { supabase, unauthorized } = await requireAdminUser()
   if (unauthorized) return unauthorized
 
-  const [{ data: employees, error: empError }, { data: reqs, error: reqError }, { data: locations, error: locError }] =
+  const [{ data: employees, error: empError }, { data: reqs, error: reqError }, { data: locations, error: locError }, { data: shifts, error: shiftError }] =
     await Promise.all([
       supabase.from('users').select('id, full_name, email').order('full_name'),
       supabase.from('hrm_employee_requirements').select('*'),
       supabase.from('hrm_work_locations').select('id, name').eq('is_active', true).order('name'),
+      supabase.from('hrm_shifts').select('id, name, is_default').eq('is_active', true).order('start_time'),
     ])
 
-  if (empError || reqError || locError) {
+  if (empError || reqError || locError || shiftError) {
     return NextResponse.json({ error: 'Không tải được dữ liệu' }, { status: 500 })
   }
 
@@ -31,10 +32,11 @@ export async function GET() {
       require_wifi: r?.require_wifi ?? true,
       require_face: r?.require_face ?? true,
       location_id: r?.location_id ?? null,
+      shift_id: r?.shift_id ?? null,
     }
   })
 
-  return NextResponse.json({ employees: merged, locations: locations ?? [] })
+  return NextResponse.json({ employees: merged, locations: locations ?? [], shifts: shifts ?? [] })
 }
 
 export async function POST(req: NextRequest) {
@@ -52,6 +54,7 @@ export async function POST(req: NextRequest) {
   if (typeof body.require_wifi === 'boolean') update.require_wifi = body.require_wifi
   if (typeof body.require_face === 'boolean') update.require_face = body.require_face
   if (body.location_id === null || typeof body.location_id === 'string') update.location_id = body.location_id
+  if (body.shift_id === null || typeof body.shift_id === 'string') update.shift_id = body.shift_id
 
   const { error } = await supabase.from('hrm_employee_requirements').upsert(update)
   if (error) return NextResponse.json({ error: 'Không lưu được cấu hình' }, { status: 500 })
