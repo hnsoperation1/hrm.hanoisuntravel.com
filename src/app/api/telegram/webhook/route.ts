@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sendMessage, openAppButton } from '@/lib/telegram'
+import { sendMessage } from '@/lib/telegram'
 
 interface TelegramMessage {
   chat: { id: number }
@@ -31,5 +31,5 @@ async function handleMessage(message: TelegramMessage) {
   // Bot chỉ đóng vai trò "lối tắt" mở web — không tự xử lý vị trí/định danh
   // nhân viên trong Telegram nữa. Đăng nhập/chấm công vẫn hoàn toàn qua
   // Supabase Auth như mở trực tiếp bằng trình duyệt.
-  await sendMessage(chatId, 'Bấm nút bên dưới để mở trang chấm công:', openAppButton())
+  await sendMessage(chatId, `Vào ${process.env.NEXT_PUBLIC_APP_URL} để chấm công nhé.`)
 }
