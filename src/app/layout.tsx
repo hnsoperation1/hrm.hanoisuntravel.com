@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/auth";
-import { AttendanceProvider } from "@/contexts/attendance";
 import { AppShell } from "@/components/AppShell";
 
 export const metadata: Metadata = {
@@ -40,9 +39,7 @@ export default function RootLayout({
     <html lang="vi" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
         <AuthProvider>
-          <AttendanceProvider>
-            <AppShell>{children}</AppShell>
-          </AttendanceProvider>
+          <AppShell>{children}</AppShell>
         </AuthProvider>
       </body>
     </html>
