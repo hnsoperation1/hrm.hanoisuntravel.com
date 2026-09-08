@@ -272,69 +272,64 @@ export function CheckInWizard({ type, onCancel, onComplete }: Props) {
           <p className="text-sm">{checkingLabel}</p>
         </div>
       ) : (
-        <div className="flex flex-1 flex-col px-6">
-          {/* Icon/kết quả đẩy lên gần đầu — KHÔNG gộp chung khối căn giữa với
-              nút bấm nữa, để nút "Tiếp theo" có thể nằm giữa phần không gian
-              còn lại (dễ với tay hơn), thay vì dính sát ngay dưới dòng chữ. */}
-          <div className="flex flex-col items-center gap-4 pt-10">
-            <Icon size={72} className={stepOk ? 'text-green-500' : 'text-red-500'} />
-            <div className="flex items-center gap-2 text-sm font-medium">
-              {stepOk ? (
-                <>
-                  <CheckCircle2 size={18} className="text-green-500" />
-                  <span className="text-gray-700">Thành công</span>
-                </>
-              ) : (
-                <>
-                  <XCircle size={18} className="text-red-500" />
-                  <span className="text-gray-700">Thất bại</span>
-                </>
-              )}
-            </div>
-            {/* Cố tình KHÔNG hiện số mét cụ thể (dù server có tính) — lộ ra
-                là nhân viên dò được đúng bán kính cho phép rồi đứng ở rìa
-                (vd chân toà nhà) để "lách" thay vì thực sự có mặt. */}
-            <p className="text-center text-sm text-gray-500">
-              {currentKind === 'wifi'
-                ? stepOk
-                  ? `Đúng mạng văn phòng${precheck.nearestLocationName ? ` "${precheck.nearestLocationName}"` : ''}`
-                  : 'IP hiện tại không khớp mạng văn phòng nào'
-                : stepOk
-                  ? `Đúng vị trí${precheck.nearestLocationName ? ` — ${precheck.nearestLocationName}` : ''}`
-                  : 'Sai vị trí — không ở văn phòng'}
-            </p>
+        <div className="flex flex-1 flex-col items-center gap-4 px-6 pt-10">
+          {/* Icon to gấp 3 (216px thay vì 72px) — nút bấm bám NGAY sau khối
+              này theo dòng chảy bình thường, không đẩy xuống giữa màn hình
+              nữa (icon đã đủ to để chiếm phần lớn không gian phía trên). */}
+          <Icon size={216} className={stepOk ? 'text-green-500' : 'text-red-500'} />
+          <div className="flex items-center gap-2 text-sm font-medium">
+            {stepOk ? (
+              <>
+                <CheckCircle2 size={18} className="text-green-500" />
+                <span className="text-gray-700">Thành công</span>
+              </>
+            ) : (
+              <>
+                <XCircle size={18} className="text-red-500" />
+                <span className="text-gray-700">Thất bại</span>
+              </>
+            )}
           </div>
+          {/* Cố tình KHÔNG hiện số mét cụ thể (dù server có tính) — lộ ra là
+              nhân viên dò được đúng bán kính cho phép rồi đứng ở rìa (vd
+              chân toà nhà) để "lách" thay vì thực sự có mặt. */}
+          <p className="text-center text-sm text-gray-500">
+            {currentKind === 'wifi'
+              ? stepOk
+                ? `Đúng mạng văn phòng${precheck.nearestLocationName ? ` "${precheck.nearestLocationName}"` : ''}`
+                : 'IP hiện tại không khớp mạng văn phòng nào'
+              : stepOk
+                ? `Đúng vị trí${precheck.nearestLocationName ? ` — ${precheck.nearestLocationName}` : ''}`
+                : 'Sai vị trí — không ở văn phòng'}
+          </p>
 
-          {/* Nút bấm nằm giữa phần không gian còn lại bên dưới. */}
-          <div className="flex flex-1 flex-col items-center justify-center">
-            <div className="w-full">
-              {stepOk ? (
+          <div className="w-full pt-2">
+            {stepOk ? (
+              <button
+                type="button"
+                onClick={advanceStep}
+                className="w-full rounded-xl bg-brand-500 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-600"
+              >
+                Tiếp theo
+              </button>
+            ) : (
+              <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={advanceStep}
-                  className="w-full rounded-xl bg-brand-500 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-600"
+                  onClick={onCancel}
+                  className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-bold text-gray-600 transition-colors hover:bg-gray-50"
                 >
-                  Tiếp theo
+                  Đóng
                 </button>
-              ) : (
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={onCancel}
-                    className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-bold text-gray-600 transition-colors hover:bg-gray-50"
-                  >
-                    Đóng
-                  </button>
-                  <button
-                    type="button"
-                    onClick={loadChecks}
-                    className="flex-1 rounded-xl bg-brand-500 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-600"
-                  >
-                    Thử lại
-                  </button>
-                </div>
-              )}
-            </div>
+                <button
+                  type="button"
+                  onClick={loadChecks}
+                  className="flex-1 rounded-xl bg-brand-500 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-600"
+                >
+                  Thử lại
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
