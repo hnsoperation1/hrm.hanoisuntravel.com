@@ -174,8 +174,7 @@ export default function ChamCongPage() {
               <XCircle size={16} className="shrink-0 mt-0.5" />
               <span>
                 Chấm công KHÔNG hợp lệ — {lastResult.failReason ?? 'không đạt điều kiện'}.
-                {lastResult.nearestLocationName &&
-                  ` (cách "${lastResult.nearestLocationName}" ${lastResult.distanceM}m)`}{' '}
+                {lastResult.nearestLocationName && ` (${lastResult.nearestLocationName})`}{' '}
                 Lượt này vẫn được lưu lại để quản lý xem xét.
               </span>
             </div>
