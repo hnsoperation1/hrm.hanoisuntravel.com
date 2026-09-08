@@ -125,6 +125,9 @@ async function handleMessage(message: TelegramMessage) {
     status: 'pending_requester',
     requesterName: requester?.full_name ?? 'Nhân viên',
     managerName,
+    adminName: null,
+    requesterConfirmed: false,
+    managerAgreed: false,
   })
 
   const sent = await sendMessage(chatId, card.text, card.replyMarkup)
@@ -201,10 +204,19 @@ async function handleCallbackQuery(cq: TelegramCallbackQuery) {
     return link?.chat_id === callerId
   }
 
+  const { data: settings } = await supabase.from('hrm_app_settings').select('attendance_admin_user_id').eq('id', 1).maybeSingle()
+  const adminUserId = settings?.attendance_admin_user_id ?? null
+
   // Chặn quyền TRƯỚC khi đổi bất cứ gì — sai người bấm thì chỉ báo lỗi, dữ
   // liệu đơn giữ nguyên.
   if (action === 'edit' || action === 'editfield' || action === 'submit' || action === 'donemenu') {
     if (request.status !== 'pending_requester' || !(await isLinkedTo(request.requester_id))) {
+      await answerCallbackQuery(cq.id, 'Bạn không có quyền thao tác này', true)
+      return
+    }
+  } else if (action === 'cancel') {
+    const cancellable = ['pending_requester', 'pending_manager', 'pending_admin'].includes(request.status)
+    if (!cancellable || !(await isLinkedTo(request.requester_id))) {
       await answerCallbackQuery(cq.id, 'Bạn không có quyền thao tác này', true)
       return
     }
@@ -214,12 +226,7 @@ async function handleCallbackQuery(cq: TelegramCallbackQuery) {
       return
     }
   } else if (action === 'approve') {
-    const { data: settings } = await supabase
-      .from('hrm_app_settings')
-      .select('attendance_admin_user_id')
-      .eq('id', 1)
-      .maybeSingle()
-    if (request.status !== 'pending_admin' || !settings?.attendance_admin_user_id || !(await isLinkedTo(settings.attendance_admin_user_id))) {
+    if (request.status !== 'pending_admin' || !adminUserId || !(await isLinkedTo(adminUserId))) {
       await answerCallbackQuery(cq.id, 'Bạn không có quyền thao tác này', true)
       return
     }
@@ -232,6 +239,7 @@ async function handleCallbackQuery(cq: TelegramCallbackQuery) {
   const managerName = request.manager_id
     ? (await supabase.from('users').select('full_name').eq('id', request.manager_id).maybeSingle()).data?.full_name ?? null
     : null
+  const adminName = adminUserId ? (await supabase.from('users').select('full_name').eq('id', adminUserId).maybeSingle()).data?.full_name ?? null : null
 
   if (action === 'edit') {
     const menu = renderEditMenu({ request_no: request.request_no, type: request.type, fields: request.fields })
@@ -252,18 +260,26 @@ async function handleCallbackQuery(cq: TelegramCallbackQuery) {
     return
   }
 
-  const statusByAction = { donemenu: 'pending_requester', submit: 'pending_manager', agree: 'pending_admin', approve: 'approved' } as const
+  const statusByAction = {
+    donemenu: 'pending_requester',
+    submit: 'pending_manager',
+    agree: 'pending_admin',
+    approve: 'approved',
+    cancel: 'rejected',
+  } as const
   const timestampColByAction: Record<string, string | null> = {
     donemenu: null,
     submit: 'requester_confirmed_at',
     agree: 'manager_confirmed_at',
     approve: 'admin_approved_at',
+    cancel: null,
   }
   const toastByAction: Record<string, string | undefined> = {
     donemenu: undefined,
     submit: 'Đã nộp đơn',
     agree: 'Đã đồng ý',
     approve: 'Đã duyệt',
+    cancel: 'Đã hủy đơn',
   }
 
   const newStatus = statusByAction[action as keyof typeof statusByAction]
@@ -280,6 +296,9 @@ async function handleCallbackQuery(cq: TelegramCallbackQuery) {
     status: newStatus,
     requesterName,
     managerName,
+    adminName,
+    requesterConfirmed: Boolean(update.requester_confirmed_at ?? request.requester_confirmed_at),
+    managerAgreed: Boolean(update.manager_confirmed_at ?? request.manager_confirmed_at),
   })
   await editMessageText(request.group_chat_id, request.bot_message_id, card.text, card.replyMarkup)
   await answerCallbackQuery(cq.id, toastByAction[action])

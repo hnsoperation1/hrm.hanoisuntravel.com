@@ -19,6 +19,7 @@ export const LEAVE_REQUEST_FIELDS: Record<LeaveRequestType, { key: string; label
   nghi_phep: [
     { key: 'tu_ngay', label: 'Từ ngày' },
     { key: 'den_ngay', label: 'Đến ngày' },
+    { key: 'buoi', label: 'Buổi' },
     { key: 'ly_do', label: 'Lý do' },
   ],
   di_muon: [
@@ -34,6 +35,7 @@ export const LEAVE_REQUEST_FIELDS: Record<LeaveRequestType, { key: string; label
   lam_online: [
     { key: 'tu_ngay', label: 'Từ ngày' },
     { key: 'den_ngay', label: 'Đến ngày' },
+    { key: 'buoi', label: 'Buổi' },
     { key: 'ly_do', label: 'Lý do' },
   ],
   cong_tac: [
@@ -69,6 +71,10 @@ Hôm nay là ngày ${today} (giờ Việt Nam). Nếu người viết nhắc ng�
 
 5 loại đơn và các field tương ứng:
 ${fieldsDoc}
+
+Riêng "nghi_phep" và "lam_online" có field "buoi" (Buổi): giá trị là "Sáng", "Chiều" hoặc "Cả ngày".
+- Chỉ xin nghỉ/làm online 1 buổi của 1 ngày (vd "nghỉ chiều nay", "làm online sáng mai") -> tu_ngay = den_ngay = đúng ngày đó, buoi = "Sáng" hoặc "Chiều".
+- Xin cả ngày hoặc nhiều ngày (vd "nghỉ từ mai đến thứ 6", "nghỉ cả ngày mai") -> buoi = "Cả ngày".
 
 Chỉ trả lời bằng JSON, KHÔNG kèm chữ nào khác, đúng 1 trong 2 dạng:
 {"is_request": false}
