@@ -21,6 +21,10 @@ export async function GET(req: NextRequest) {
       'id, type, created_at, is_within_radius, is_ip_verified, is_face_verified, is_success, distance_m, face_distance, hrm_work_locations(name)',
     )
     .eq('user_id', user!.id)
+    // Chỉ lấy lượt chấm công THÀNH CÔNG — đây là màn xem lại lịch sử cho
+    // nhân viên tự đối chiếu công, không phải log audit đầy đủ (đã có riêng
+    // ở /admin/bao-cao cho admin), nên không cần lẫn các lượt thất bại vào.
+    .eq('is_success', true)
     .gte('created_at', since.toISOString())
     .order('created_at', { ascending: false })
 
