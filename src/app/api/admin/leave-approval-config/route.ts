@@ -2,34 +2,33 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminUser } from '@/lib/auth'
 
 // Cấu hình cho luồng duyệt đơn từ qua Telegram: chat_id Telegram của từng
-// nhân viên (admin nhập tay), quản lý trực tiếp của từng nhân viên, danh
-// sách nhóm HCNS bot được phép đọc, và admin chấm công (người bấm "Duyệt").
+// nhân viên (admin nhập tay), danh sách nhóm HCNS bot được phép đọc, và admin
+// chấm công (người bấm "Duyệt"). Chỉ 2 vai trong bot — người nộp đơn và admin
+// chấm công — không có bước "quản lý trực tiếp" (việc xin phép quản lý diễn
+// ra riêng, ngoài bot, trước khi đăng vào nhóm).
 export async function GET() {
   const { supabase, unauthorized } = await requireAdminUser()
   if (unauthorized) return unauthorized
 
-  const [{ data: employees, error: empError }, { data: links, error: linkError }, { data: reqs, error: reqError }, { data: groups, error: groupError }, { data: settings, error: settingsError }] =
+  const [{ data: employees, error: empError }, { data: links, error: linkError }, { data: groups, error: groupError }, { data: settings, error: settingsError }] =
     await Promise.all([
       supabase.from('users').select('id, full_name, email').order('full_name'),
       supabase.from('hrm_telegram_links').select('chat_id, user_id'),
-      supabase.from('hrm_employee_requirements').select('user_id, manager_id'),
       supabase.from('hrm_telegram_groups').select('chat_id, label').order('label'),
       supabase.from('hrm_app_settings').select('attendance_admin_user_id').eq('id', 1).maybeSingle(),
     ])
 
-  if (empError || linkError || reqError || groupError || settingsError) {
+  if (empError || linkError || groupError || settingsError) {
     return NextResponse.json({ error: 'Không tải được dữ liệu' }, { status: 500 })
   }
 
   const chatByUser = new Map((links ?? []).map((l) => [l.user_id, l.chat_id]))
-  const managerByUser = new Map((reqs ?? []).map((r) => [r.user_id, r.manager_id]))
 
   const merged = (employees ?? []).map((e) => ({
     id: e.id,
     full_name: e.full_name,
     email: e.email,
     telegram_chat_id: chatByUser.get(e.id) ?? null,
-    manager_id: managerByUser.get(e.id) ?? null,
   }))
 
   return NextResponse.json({
@@ -62,18 +61,6 @@ export async function POST(req: NextRequest) {
     await supabase.from('hrm_telegram_links').delete().eq('user_id', userId)
     const { error } = await supabase.from('hrm_telegram_links').insert({ chat_id: chatId, user_id: userId })
     if (error) return NextResponse.json({ error: 'Không lưu được liên kết' }, { status: 500 })
-    return NextResponse.json({ ok: true })
-  }
-
-  if (body?.kind === 'manager') {
-    const userId = typeof body.userId === 'string' ? body.userId : null
-    if (!userId) return NextResponse.json({ error: 'Thiếu userId' }, { status: 400 })
-    const managerId = body.managerId === null ? null : typeof body.managerId === 'string' ? body.managerId : undefined
-    if (managerId === undefined) return NextResponse.json({ error: 'managerId không hợp lệ' }, { status: 400 })
-    const { error } = await supabase
-      .from('hrm_employee_requirements')
-      .upsert({ user_id: userId, manager_id: managerId, updated_at: new Date().toISOString() })
-    if (error) return NextResponse.json({ error: 'Không lưu được quản lý trực tiếp' }, { status: 500 })
     return NextResponse.json({ ok: true })
   }
 

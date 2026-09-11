@@ -10,7 +10,6 @@ type Employee = {
   full_name: string
   email: string
   telegram_chat_id: number | null
-  manager_id: string | null
 }
 
 type Group = { chat_id: number; label: string }
@@ -71,14 +70,6 @@ export default function DuyetDonTuPage() {
     } else {
       load()
     }
-  }
-
-  async function saveManager(emp: Employee, managerId: string | null) {
-    setEmployees((prev) => prev.map((e) => (e.id === emp.id ? { ...e, manager_id: managerId } : e)))
-    setSavingId(emp.id)
-    const ok = await post({ kind: 'manager', userId: emp.id, managerId })
-    setSavingId(null)
-    if (!ok) load()
   }
 
   async function saveAdmin(userId: string | null) {
@@ -197,8 +188,7 @@ export default function DuyetDonTuPage() {
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
           <h2 className="text-sm font-bold text-gray-800 mb-1">Nhân viên</h2>
           <p className="text-xs text-gray-400 mb-3">
-            ID Telegram: nhân viên tự nhắn cho bot (DM riêng hoặc trong nhóm) để lấy ID, gửi cho bạn dán vào đây. Quản
-            lý trực tiếp là người sẽ bấm &quot;Đồng ý&quot; ở bước 2.
+            ID Telegram: nhân viên tự nhắn cho bot (DM riêng hoặc trong nhóm) để lấy ID, gửi cho bạn dán vào đây.
           </p>
 
           {loading ? (
@@ -214,29 +204,13 @@ export default function DuyetDonTuPage() {
                     </div>
                     {savingId === emp.id && <Loader2 size={14} className="animate-spin text-gray-400 shrink-0" />}
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <input
-                      value={chatIdInputs[emp.id] ?? ''}
-                      onChange={(e) => setChatIdInputs((prev) => ({ ...prev, [emp.id]: e.target.value }))}
-                      onBlur={() => saveChatId(emp)}
-                      placeholder="ID Telegram"
-                      className="flex-1 min-w-[140px] text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-400"
-                    />
-                    <select
-                      value={emp.manager_id ?? ''}
-                      onChange={(e) => saveManager(emp, e.target.value || null)}
-                      className="flex-1 min-w-[160px] text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-400"
-                    >
-                      <option value="">Chưa gán quản lý trực tiếp</option>
-                      {employees
-                        .filter((m) => m.id !== emp.id)
-                        .map((m) => (
-                          <option key={m.id} value={m.id}>
-                            QLTT: {m.full_name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
+                  <input
+                    value={chatIdInputs[emp.id] ?? ''}
+                    onChange={(e) => setChatIdInputs((prev) => ({ ...prev, [emp.id]: e.target.value }))}
+                    onBlur={() => saveChatId(emp)}
+                    placeholder="ID Telegram"
+                    className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  />
                 </div>
               ))}
             </div>

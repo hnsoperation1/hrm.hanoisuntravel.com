@@ -11,7 +11,6 @@ type LeaveRequest = {
   type: LeaveRequestType
   fields: Record<string, string>
   status: string
-  managerName: string | null
   createdAt: string
 }
 
@@ -56,10 +55,7 @@ export default function DonTuPage() {
                     </p>
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-gray-400">
-                  {r.managerName ? `Quản lý trực tiếp: ${r.managerName} · ` : ''}
-                  {new Date(r.createdAt).toLocaleString('vi-VN')}
-                </p>
+                <p className="mt-2 text-xs text-gray-400">{new Date(r.createdAt).toLocaleString('vi-VN')}</p>
               </div>
             ))}
           </div>

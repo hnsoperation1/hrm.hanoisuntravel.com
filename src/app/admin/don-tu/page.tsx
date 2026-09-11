@@ -13,7 +13,6 @@ type LeaveRequest = {
   fields: Record<string, string>
   status: string
   requesterName: string
-  managerName: string | null
   rawText: string
   createdAt: string
 }
@@ -73,10 +72,7 @@ export default function AdminDonTuPage() {
                       </p>
                     ))}
                   </div>
-                  <p className="mt-2 text-xs text-gray-400">
-                    {r.managerName ? `Quản lý trực tiếp: ${r.managerName} · ` : ''}
-                    {new Date(r.createdAt).toLocaleString('vi-VN')}
-                  </p>
+                  <p className="mt-2 text-xs text-gray-400">{new Date(r.createdAt).toLocaleString('vi-VN')}</p>
                   <button
                     type="button"
                     onClick={() => setExpanded(isOpen ? null : r.requestNo)}

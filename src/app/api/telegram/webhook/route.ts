@@ -90,21 +90,12 @@ async function handleMessage(message: TelegramMessage) {
   if (!parsed || !parsed.isRequest) return
 
   const { data: requester } = await supabase.from('users').select('full_name').eq('id', link.user_id).maybeSingle()
-  const { data: reqSettings } = await supabase
-    .from('hrm_employee_requirements')
-    .select('manager_id')
-    .eq('user_id', link.user_id)
-    .maybeSingle()
-
-  const managerId = reqSettings?.manager_id ?? null
-  const managerName = managerId ? (await supabase.from('users').select('full_name').eq('id', managerId).maybeSingle()).data?.full_name ?? null : null
 
   const { data: created, error } = await supabase
     .from('hrm_leave_requests')
     .insert({
       type: parsed.type,
       requester_id: link.user_id,
-      manager_id: managerId,
       group_chat_id: chatId,
       raw_text: text,
       fields: parsed.fields,
@@ -124,10 +115,8 @@ async function handleMessage(message: TelegramMessage) {
     fields: parsed.fields,
     status: 'pending_requester',
     requesterName: requester?.full_name ?? 'Nhân viên',
-    managerName,
     adminName: null,
     requesterConfirmed: false,
-    managerAgreed: false,
   })
 
   const sent = await sendMessage(chatId, card.text, card.replyMarkup)
@@ -215,13 +204,8 @@ async function handleCallbackQuery(cq: TelegramCallbackQuery) {
       return
     }
   } else if (action === 'cancel') {
-    const cancellable = ['pending_requester', 'pending_manager', 'pending_admin'].includes(request.status)
+    const cancellable = ['pending_requester', 'pending_admin'].includes(request.status)
     if (!cancellable || !(await isLinkedTo(request.requester_id))) {
-      await answerCallbackQuery(cq.id, 'Bạn không có quyền thao tác này', true)
-      return
-    }
-  } else if (action === 'agree') {
-    if (request.status !== 'pending_manager' || !request.manager_id || !(await isLinkedTo(request.manager_id))) {
       await answerCallbackQuery(cq.id, 'Bạn không có quyền thao tác này', true)
       return
     }
@@ -236,9 +220,6 @@ async function handleCallbackQuery(cq: TelegramCallbackQuery) {
   }
 
   const requesterName = (await supabase.from('users').select('full_name').eq('id', request.requester_id).maybeSingle()).data?.full_name ?? 'Nhân viên'
-  const managerName = request.manager_id
-    ? (await supabase.from('users').select('full_name').eq('id', request.manager_id).maybeSingle()).data?.full_name ?? null
-    : null
   const adminName = adminUserId ? (await supabase.from('users').select('full_name').eq('id', adminUserId).maybeSingle()).data?.full_name ?? null : null
 
   if (action === 'edit') {
@@ -262,22 +243,19 @@ async function handleCallbackQuery(cq: TelegramCallbackQuery) {
 
   const statusByAction = {
     donemenu: 'pending_requester',
-    submit: 'pending_manager',
-    agree: 'pending_admin',
+    submit: 'pending_admin',
     approve: 'approved',
     cancel: 'rejected',
   } as const
   const timestampColByAction: Record<string, string | null> = {
     donemenu: null,
     submit: 'requester_confirmed_at',
-    agree: 'manager_confirmed_at',
     approve: 'admin_approved_at',
     cancel: null,
   }
   const toastByAction: Record<string, string | undefined> = {
     donemenu: undefined,
     submit: 'Đã nộp đơn',
-    agree: 'Đã đồng ý',
     approve: 'Đã duyệt',
     cancel: 'Đã hủy đơn',
   }
@@ -295,10 +273,8 @@ async function handleCallbackQuery(cq: TelegramCallbackQuery) {
     fields: request.fields,
     status: newStatus,
     requesterName,
-    managerName,
     adminName,
     requesterConfirmed: Boolean(update.requester_confirmed_at ?? request.requester_confirmed_at),
-    managerAgreed: Boolean(update.manager_confirmed_at ?? request.manager_confirmed_at),
   })
   await editMessageText(request.group_chat_id, request.bot_message_id, card.text, card.replyMarkup)
   await answerCallbackQuery(cq.id, toastByAction[action])

@@ -9,13 +9,13 @@ export async function GET() {
 
   const { data: requests, error } = await supabase
     .from('hrm_leave_requests')
-    .select('request_no, type, fields, status, requester_id, manager_id, raw_text, created_at')
+    .select('request_no, type, fields, status, requester_id, raw_text, created_at')
     .order('created_at', { ascending: false })
     .limit(200)
 
   if (error) return NextResponse.json({ error: 'Không tải được đơn từ' }, { status: 500 })
 
-  const userIds = [...new Set((requests ?? []).flatMap((r) => [r.requester_id, r.manager_id]).filter(Boolean))] as string[]
+  const userIds = [...new Set((requests ?? []).map((r) => r.requester_id))]
   const nameById = new Map<string, string>()
   if (userIds.length > 0) {
     const { data: users } = await supabase.from('users').select('id, full_name').in('id', userIds)
@@ -29,7 +29,6 @@ export async function GET() {
       fields: r.fields,
       status: r.status,
       requesterName: nameById.get(r.requester_id) ?? 'Không rõ',
-      managerName: r.manager_id ? nameById.get(r.manager_id) ?? null : null,
       rawText: r.raw_text,
       createdAt: r.created_at,
     })),
