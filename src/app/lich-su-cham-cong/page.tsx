@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Loader2, Minus, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Minus, Plus, RefreshCw } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 
 type DayStatus = 'du_cong' | 'thieu_cong' | 'nghi' | 'none'
@@ -64,13 +64,36 @@ export default function BangCongPage() {
   const [data, setData] = useState<Timesheet | null>(null)
   const [tab, setTab] = useState<'grid' | 'list'>('grid')
   const [showDetail, setShowDetail] = useState(true)
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState('')
+
+  function loadTimesheet() {
+    return fetch(`/api/attendance/timesheet?month=${year}-${String(month).padStart(2, '0')}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then(setData)
+  }
 
   useEffect(() => {
     setData(null)
-    fetch(`/api/attendance/timesheet?month=${year}-${String(month).padStart(2, '0')}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then(setData)
+    loadTimesheet()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ cần chạy lại khi đổi tháng
   }, [year, month])
+
+  async function handleSync() {
+    if (syncing) return
+    setSyncing(true)
+    setSyncMsg('')
+    const res = await fetch('/api/attendance/misa-sync-now', { method: 'POST' })
+    const result = await res.json().catch(() => ({}))
+    if (res.ok) {
+      setSyncMsg(result.skipped ? result.message : 'Đã đồng bộ xong')
+      await loadTimesheet()
+    } else {
+      setSyncMsg(result.error ?? 'Đồng bộ thất bại')
+    }
+    setSyncing(false)
+    setTimeout(() => setSyncMsg(''), 3000)
+  }
 
   function shiftMonth(delta: number) {
     let m = month + delta
@@ -92,8 +115,22 @@ export default function BangCongPage() {
 
   return (
     <div>
-      <PageHeader title="Bảng công" />
+      <PageHeader
+        title="Bảng công"
+        right={
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={syncing}
+            className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+            Đồng bộ
+          </button>
+        }
+      />
       <div className="mx-auto max-w-md px-4 py-4">
+        {syncMsg && <p className="mb-3 rounded-xl bg-gray-50 px-3 py-2 text-center text-xs text-gray-500">{syncMsg}</p>}
         <div className="mb-4 flex items-center justify-center gap-3">
           <button type="button" onClick={() => shiftMonth(-1)} className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
             <ChevronLeft size={18} />
