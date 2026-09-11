@@ -48,7 +48,7 @@ export default function DangKyKhuonMatPage() {
 
   return (
     <div>
-      <PageHeader title="Đăng ký khuôn mặt" />
+      <PageHeader title="Thiết lập dữ liệu khuôn mặt" />
       <div className="max-w-md mx-auto px-4 py-8">
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-50">
@@ -58,7 +58,7 @@ export default function DangKyKhuonMatPage() {
         {enrolled && (
           <div className="mb-4 flex items-center justify-center gap-2 text-sm text-green-700 bg-green-50 rounded-xl p-3">
             <CheckCircle2 size={16} />
-            Đã đăng ký {enrolledAt ? `lúc ${new Date(enrolledAt).toLocaleString('vi-VN')}` : ''}
+            Đã thiết lập {enrolledAt ? `lúc ${new Date(enrolledAt).toLocaleString('vi-VN')}` : ''}
           </div>
         )}
 
@@ -68,7 +68,7 @@ export default function DangKyKhuonMatPage() {
           className="w-full flex items-center justify-center gap-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-60 text-white text-sm font-bold py-3 rounded-xl"
         >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <ScanFace size={14} />}
-          {enrolled ? 'Đăng ký lại (chụp ảnh mới)' : 'Bắt đầu đăng ký'}
+          {enrolled ? 'Thiết lập lại (chụp ảnh mới)' : 'Bắt đầu thiết lập'}
         </button>
 
         {error && <p className="mt-3 text-xs text-red-500">{error}</p>}
@@ -79,7 +79,7 @@ export default function DangKyKhuonMatPage() {
           onCapture={handleCapture}
           onCancel={() => setCapturing(false)}
           sampleCount={5}
-          title="Chụp 5 ảnh để đăng ký"
+          title="Chụp 5 ảnh để thiết lập"
         />
       )}
       </div>

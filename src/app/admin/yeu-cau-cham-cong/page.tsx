@@ -254,9 +254,9 @@ export default function YeuCauChamCongPage() {
                         <ScanFace size={14} className="text-brand-500" />
                         Dữ liệu khuôn mặt —{' '}
                         {face.enrolled ? (
-                          <span className="text-green-600">đã đăng ký ({face.embeddings.length} mẫu)</span>
+                          <span className="text-green-600">đã thiết lập ({face.embeddings.length} mẫu)</span>
                         ) : (
-                          <span className="text-gray-400">chưa đăng ký</span>
+                          <span className="text-gray-400">chưa thiết lập</span>
                         )}
                       </span>
                       {face.enrolled && (isFaceOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
@@ -265,7 +265,7 @@ export default function YeuCauChamCongPage() {
                     {isFaceOpen && face.enrolled && (
                       <div className="mt-3 space-y-3">
                         <p className="text-xs text-gray-400">
-                          Đăng ký lúc {new Date(face.enrolledAt).toLocaleString('vi-VN')}
+                          Thiết lập lúc {new Date(face.enrolledAt).toLocaleString('vi-VN')}
                         </p>
 
                         <div className="flex flex-wrap gap-2">

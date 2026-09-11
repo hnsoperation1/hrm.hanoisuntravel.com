@@ -187,16 +187,16 @@ export default function ChamCongPage() {
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-accent-100">
             <ScanFace size={22} className="text-accent-500" />
           </div>
-          <p className="mb-1 text-sm font-bold text-gray-800">Bạn chưa đăng ký khuôn mặt</p>
+          <p className="mb-1 text-sm font-bold text-gray-800">Bạn chưa thiết lập dữ liệu khuôn mặt</p>
           <p className="mb-4 text-xs text-gray-500">
-            Cần đăng ký khuôn mặt trước để hệ thống xác thực đúng người mỗi lần chấm công.
+            Cần thiết lập dữ liệu khuôn mặt trước để hệ thống xác thực đúng người mỗi lần chấm công.
           </p>
           <Link
             href="/dang-ky-khuon-mat"
             className="inline-flex items-center gap-1.5 rounded-xl bg-accent-500 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-600"
           >
             <ScanFace size={14} />
-            Đăng ký khuôn mặt ngay
+            Thiết lập dữ liệu khuôn mặt ngay
           </Link>
         </div>
       )}

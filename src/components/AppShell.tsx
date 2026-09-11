@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/auth'
 import { BottomNav, BOTTOM_NAV_PATHS } from './BottomNav'
 import { DesktopNotice } from './DesktopNotice'
+import { PullToRefresh } from './PullToRefresh'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -58,11 +59,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
       <DesktopNotice />
-      <main
-        className={`flex-1 overflow-y-auto ${showBottomNav ? 'pb-[calc(env(safe-area-inset-bottom)+80px)]' : ''}`}
-      >
+      <PullToRefresh className={`flex-1 overflow-y-auto ${showBottomNav ? 'pb-[calc(env(safe-area-inset-bottom)+80px)]' : ''}`}>
         {children}
-      </main>
+      </PullToRefresh>
       {showBottomNav && <BottomNav />}
     </div>
   )
