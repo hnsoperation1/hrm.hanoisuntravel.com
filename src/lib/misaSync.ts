@@ -15,12 +15,20 @@ function vnDayKey(iso: string) {
 export type MisaSyncResult = { punchesFetched: number; rowsInserted: number }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- client service_role dùng chung cho nhiều bảng, không cần generic type đầy đủ ở đây
-export async function runMisaSync(supabase: SupabaseClient<any>): Promise<MisaSyncResult> {
-  const { data: settings } = await supabase.from('hrm_app_settings').select('misa_last_synced_at').eq('id', 1).maybeSingle()
+export async function runMisaSync(supabase: SupabaseClient<any>, options?: { fromDate?: Date }): Promise<MisaSyncResult> {
   const now = new Date()
-  // Lần đầu chưa có mốc nào — lấy lùi lại 2 ngày cho chắc, tránh bỏ sót lượt
-  // quẹt cuối ngày hôm trước nếu server/cron trễ giờ.
-  const fromDate = settings?.misa_last_synced_at ? new Date(settings.misa_last_synced_at) : new Date(now.getTime() - 2 * 24 * 3600 * 1000)
+
+  let fromDate: Date
+  if (options?.fromDate) {
+    // Chỉ định sẵn mốc bắt đầu — dùng cho nút "Đồng bộ lại từ ngày X" của
+    // super admin (backfill), bỏ qua misa_last_synced_at.
+    fromDate = options.fromDate
+  } else {
+    const { data: settings } = await supabase.from('hrm_app_settings').select('misa_last_synced_at').eq('id', 1).maybeSingle()
+    // Lần đầu chưa có mốc nào — lấy lùi lại 2 ngày cho chắc, tránh bỏ sót
+    // lượt quẹt cuối ngày hôm trước nếu server/cron trễ giờ.
+    fromDate = settings?.misa_last_synced_at ? new Date(settings.misa_last_synced_at) : new Date(now.getTime() - 2 * 24 * 3600 * 1000)
+  }
 
   const punches = await fetchMisaRawPunches(fromDate, now)
 

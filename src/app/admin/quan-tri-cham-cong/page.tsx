@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, Trash2 } from 'lucide-react'
+import { Loader2, RefreshCw, Trash2 } from 'lucide-react'
 import { useAuth } from '@/contexts/auth'
 import { PageHeader } from '@/components/PageHeader'
 
@@ -24,6 +24,8 @@ export default function QuanTriChamCongPage() {
   const [resetDate, setResetDate] = useState(todayIsoDate())
   const [resetting, setResetting] = useState(false)
   const [resetMsg, setResetMsg] = useState('')
+  const [backfilling, setBackfilling] = useState(false)
+  const [backfillMsg, setBackfillMsg] = useState('')
 
   useEffect(() => {
     if (!isAdmin) return
@@ -54,6 +56,20 @@ export default function QuanTriChamCongPage() {
       setResetMsg(`Đã xoá ${data.deleted} log`)
     } finally {
       setResetting(false)
+    }
+  }
+
+  async function handleBackfill() {
+    if (backfilling) return
+    if (!confirm('Đồng bộ lại toàn bộ dữ liệu MISA từ 01/09/2026 đến giờ? Có thể mất chút thời gian.')) return
+    setBackfilling(true)
+    setBackfillMsg('')
+    try {
+      const res = await fetch('/api/admin/misa-sync-backfill', { method: 'POST' })
+      const data = await res.json()
+      setBackfillMsg(res.ok ? `Xong — lấy ${data.punchesFetched} lượt quẹt, ghi mới ${data.rowsInserted} dòng` : (data.error ?? 'Đồng bộ thất bại'))
+    } finally {
+      setBackfilling(false)
     }
   }
 
@@ -102,6 +118,25 @@ export default function QuanTriChamCongPage() {
           </div>
           {resetMsg && <p className="mt-2 text-xs text-amber-800">{resetMsg}</p>}
         </div>
+
+        {user?.is_super_admin && (
+          <div className="mt-4 rounded-2xl border border-dashed border-brand-300 bg-brand-50/60 p-4">
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-brand-700">Đồng bộ lại MISA từ đầu tháng 9</p>
+            <p className="mb-3 text-xs text-brand-700">
+              Kéo lại toàn bộ dữ liệu chấm công thô từ MISA AMIS kể từ 01/09/2026 tới giờ, bỏ qua mốc đồng bộ gần nhất
+              — dùng khi cần lấy bù dữ liệu cũ (vd mới cấu hình xong mã nhân viên). Chỉ Super Admin thấy được nút này.
+            </p>
+            <button
+              onClick={handleBackfill}
+              disabled={backfilling}
+              className="flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+            >
+              {backfilling ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              Đồng bộ từ 01/09/2026
+            </button>
+            {backfillMsg && <p className="mt-2 text-xs text-brand-800">{backfillMsg}</p>}
+          </div>
+        )}
       </div>
     </div>
   )
