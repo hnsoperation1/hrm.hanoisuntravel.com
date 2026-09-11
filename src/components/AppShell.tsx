@@ -14,9 +14,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading) return
-    if (!user && !isLoginPage) router.replace('/login')
-    if (user && isLoginPage) router.replace('/')
-  }, [user, loading, isLoginPage, router])
+    // Giữ lại đường dẫn định vào ban đầu (vd trang xác nhận đăng nhập QR mở
+    // từ link quét) — không phải lúc nào đăng nhập xong cũng nên về Trang chủ.
+    // Đọc thẳng window.location thay vì useSearchParams() để khỏi phải bọc
+    // Suspense cho MỌI trang tĩnh trong app (AppShell nằm ở layout gốc).
+    if (!user && !isLoginPage) router.replace(`/login?next=${encodeURIComponent(pathname)}`)
+    if (user && isLoginPage) {
+      const next = new URLSearchParams(window.location.search).get('next')
+      router.replace(next || '/')
+    }
+  }, [user, loading, isLoginPage, pathname, router])
 
   if (loading || (!user && !isLoginPage)) {
     return (

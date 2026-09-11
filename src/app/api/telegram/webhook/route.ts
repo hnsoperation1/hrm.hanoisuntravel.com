@@ -16,6 +16,7 @@ interface TelegramCallbackQuery {
   id: string
   from: { id: number }
   data?: string
+  message?: { chat: { id: number }; message_id: number }
 }
 
 export async function POST(req: NextRequest) {
@@ -167,13 +168,53 @@ async function applyFieldEdit(supabase: SupabaseClient, request: any, newValue: 
 }
 
 async function handleCallbackQuery(cq: TelegramCallbackQuery) {
-  const supabase = createAdminClient()
-  const [prefix, requestNoRaw, action, extra] = (cq.data ?? '').split(':')
+  const [prefix] = (cq.data ?? '').split(':')
+
+  if (prefix === 'qr') {
+    await handleQrLoginCallback(cq)
+    return
+  }
 
   if (prefix !== 'lr') {
     await answerCallbackQuery(cq.id)
     return
   }
+
+  await handleLeaveRequestCallback(cq)
+}
+
+async function handleQrLoginCallback(cq: TelegramCallbackQuery) {
+  const admin = createAdminClient()
+  const [, sessionId, action] = (cq.data ?? '').split(':')
+
+  const { data: session } = await admin.from('hrm_qr_login_sessions').select('*').eq('id', sessionId).maybeSingle()
+  if (!session) {
+    await answerCallbackQuery(cq.id, 'Phiên đăng nhập này không còn tồn tại', true)
+    return
+  }
+
+  const { data: link } = await admin.from('hrm_telegram_links').select('chat_id').eq('user_id', session.user_id).maybeSingle()
+  if (session.status !== 'scanned' || link?.chat_id !== cq.from.id) {
+    await answerCallbackQuery(cq.id, 'Bạn không có quyền thao tác này', true)
+    return
+  }
+
+  const approve = action === 'approve'
+  await admin.from('hrm_qr_login_sessions').update({ status: approve ? 'approved' : 'rejected' }).eq('id', sessionId)
+
+  if (cq.message) {
+    await editMessageText(
+      cq.message.chat.id,
+      cq.message.message_id,
+      approve ? '✅ Đã xác nhận đăng nhập.' : '❌ Đã từ chối đăng nhập.',
+    )
+  }
+  await answerCallbackQuery(cq.id, approve ? 'Đã xác nhận' : 'Đã từ chối')
+}
+
+async function handleLeaveRequestCallback(cq: TelegramCallbackQuery) {
+  const supabase = createAdminClient()
+  const [, requestNoRaw, action, extra] = (cq.data ?? '').split(':')
 
   const { data: request } = await supabase
     .from('hrm_leave_requests')

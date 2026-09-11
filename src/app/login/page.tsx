@@ -1,11 +1,89 @@
 'use client'
 
-import { useState } from 'react'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Eye, EyeOff, Loader2, QrCode, RotateCw } from 'lucide-react'
+import QRCode from 'qrcode'
 import { useAuth } from '@/contexts/auth'
+
+type QrStatus = 'idle' | 'loading' | 'pending' | 'scanned' | 'approved' | 'rejected' | 'expired'
+
+function QrLoginPanel() {
+  const [status, setStatus] = useState<QrStatus>('idle')
+  const [qrImage, setQrImage] = useState<string | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+  }
+
+  async function start() {
+    stopPolling()
+    setStatus('loading')
+    setQrImage(null)
+
+    const res = await fetch('/api/auth/qr/create', { method: 'POST' })
+    if (!res.ok) {
+      setStatus('expired')
+      return
+    }
+    const { sessionId } = await res.json()
+    const url = `${window.location.origin}/xac-nhan-dang-nhap/${sessionId}`
+    setQrImage(await QRCode.toDataURL(url, { margin: 1, width: 220 }))
+    setStatus('pending')
+
+    pollRef.current = setInterval(async () => {
+      const statusRes = await fetch(`/api/auth/qr/status/${sessionId}`)
+      const data = await statusRes.json().catch(() => ({ status: 'expired' }))
+      if (data.status === 'approved') {
+        stopPolling()
+        window.location.href = '/'
+        return
+      }
+      if (data.status === 'rejected' || data.status === 'expired') {
+        stopPolling()
+      }
+      setStatus(data.status)
+    }, 1500)
+  }
+
+  useEffect(() => {
+    start()
+    return stopPolling
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy 1 lần lúc mở tab QR
+  }, [])
+
+  return (
+    <div className="flex flex-col items-center gap-4 py-2">
+      <div className="flex h-56 w-56 items-center justify-center rounded-2xl border border-gray-100 bg-gray-50">
+        {status === 'loading' && <Loader2 size={24} className="animate-spin text-gray-300" />}
+        {qrImage && (status === 'pending' || status === 'scanned') && (
+          // eslint-disable-next-line @next/next/no-img-element -- ảnh QR data URL tạo lúc runtime, không phải asset tĩnh
+          <img src={qrImage} alt="Mã QR đăng nhập" className={status === 'scanned' ? 'opacity-30' : ''} />
+        )}
+        {(status === 'rejected' || status === 'expired') && (
+          <button type="button" onClick={start} className="flex flex-col items-center gap-2 text-gray-400 hover:text-brand-500">
+            <RotateCw size={22} />
+            <span className="text-xs font-medium">Tạo mã mới</span>
+          </button>
+        )}
+      </div>
+
+      <p className="text-center text-xs text-gray-500">
+        {status === 'pending' && 'Dùng camera điện thoại (đã đăng nhập sẵn) quét mã này'}
+        {status === 'scanned' && 'Đã quét — xác nhận trên điện thoại hoặc Telegram để đăng nhập'}
+        {status === 'rejected' && 'Đăng nhập đã bị từ chối trên điện thoại'}
+        {status === 'expired' && 'Mã đã hết hạn'}
+      </p>
+    </div>
+  )
+}
 
 export default function LoginPage() {
   const { login } = useAuth()
+  const [mode, setMode] = useState<'password' | 'qr'>('password')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
@@ -33,46 +111,67 @@ export default function LoginPage() {
           <p className="text-base text-gray-400 mt-2">Hanoi Sun Travel Staff App</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-brand-400"
-              placeholder="ten@hanoisuntravel.com"
-            />
-          </div>
-          <div className="relative">
-            <input
-              type={showPw ? 'text' : 'password'}
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              placeholder="Mật khẩu"
-              className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3.5 pr-11 focus:outline-none focus:ring-2 focus:ring-brand-400"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPw((s) => !s)}
-              tabIndex={-1}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
-            >
-              {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-          {error && <p className="text-xs text-red-500">{error}</p>}
+        <div className="mb-5 flex rounded-xl bg-gray-100 p-1">
           <button
-            type="submit"
-            disabled={submitting}
-            className="w-full flex items-center justify-center gap-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-60 text-white py-3.5 rounded-xl text-sm font-bold transition-colors"
+            type="button"
+            onClick={() => setMode('password')}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${mode === 'password' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
           >
-            {submitting && <Loader2 size={14} className="animate-spin" />}
-            Đăng nhập
+            Với mật khẩu
           </button>
-        </form>
+          <button
+            type="button"
+            onClick={() => setMode('qr')}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-colors ${mode === 'qr' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+          >
+            <QrCode size={14} /> Với mã QR
+          </button>
+        </div>
+
+        {mode === 'qr' ? (
+          <QrLoginPanel />
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                placeholder="ten@hanoisuntravel.com"
+              />
+            </div>
+            <div className="relative">
+              <input
+                type={showPw ? 'text' : 'password'}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                placeholder="Mật khẩu"
+                className="w-full text-sm border border-gray-200 rounded-xl px-4 py-3.5 pr-11 focus:outline-none focus:ring-2 focus:ring-brand-400"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw((s) => !s)}
+                tabIndex={-1}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+              >
+                {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            {error && <p className="text-xs text-red-500">{error}</p>}
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full flex items-center justify-center gap-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-60 text-white py-3.5 rounded-xl text-sm font-bold transition-colors"
+            >
+              {submitting && <Loader2 size={14} className="animate-spin" />}
+              Đăng nhập
+            </button>
+          </form>
+        )}
 
         <div className="flex items-center gap-3 my-6">
           <div className="h-px flex-1 bg-gray-200" />
