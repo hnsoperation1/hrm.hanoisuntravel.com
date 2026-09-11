@@ -38,7 +38,7 @@ export function BottomNav() {
         key={href}
         href={href}
         className={clsx(
-          'flex flex-1 flex-col items-center justify-center gap-0.5 py-3 transition-colors',
+          'flex flex-1 flex-col items-center justify-center gap-1 pt-3 pb-5 transition-colors',
           active ? 'text-accent-500' : 'text-gray-900 hover:text-accent-500',
         )}
       >
@@ -52,10 +52,10 @@ export function BottomNav() {
     <nav className="fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)]">
       {leftItems.map(renderItem)}
 
-      <div className="flex flex-1 items-center justify-center">
+      <div className="flex flex-1 items-center justify-center pb-3">
         <Link
           href="/cham-cong"
-          className="-mt-7 flex h-14 w-14 items-center justify-center rounded-full bg-brand-500 text-white shadow-lg ring-4 ring-white transition-colors hover:bg-brand-600"
+          className="-mt-8 flex h-14 w-14 items-center justify-center rounded-full bg-brand-500 text-white shadow-lg ring-4 ring-white transition-colors hover:bg-brand-600"
         >
           <Fingerprint size={24} />
         </Link>

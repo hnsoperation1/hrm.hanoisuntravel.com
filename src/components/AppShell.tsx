@@ -59,7 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
       <DesktopNotice />
       <main
-        className={`flex-1 overflow-y-auto ${showBottomNav ? 'pb-[calc(env(safe-area-inset-bottom)+64px)]' : ''}`}
+        className={`flex-1 overflow-y-auto ${showBottomNav ? 'pb-[calc(env(safe-area-inset-bottom)+80px)]' : ''}`}
       >
         {children}
       </main>

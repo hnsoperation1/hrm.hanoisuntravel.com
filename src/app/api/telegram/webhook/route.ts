@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SupabaseClient } from '@supabase/supabase-js'
-import { sendMessage, editMessageText, answerCallbackQuery } from '@/lib/telegram'
+import { sendMessage, editMessageText, answerCallbackQuery, inlineKeyboard } from '@/lib/telegram'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { parseLeaveRequest, LEAVE_REQUEST_FIELDS, type LeaveRequestType } from '@/lib/leaveRequestParser'
 import { renderRequestCard, renderEditMenu } from '@/lib/leaveRequestCard'
@@ -187,9 +187,29 @@ async function handleQrLoginCallback(cq: TelegramCallbackQuery) {
   const admin = createAdminClient()
   const [, sessionId, action] = (cq.data ?? '').split(':')
 
+  // Bấm trễ (phiên đã hết hạn/bị xoá sau khi đăng nhập xong, hoặc đã được xử
+  // lý ở nhánh khác — vd người dùng bấm ngay trên trang xác nhận trước) đều
+  // là trạng thái CUỐI — luôn thay nút bằng 1 dòng trạng thái, không để lại
+  // nút bấm vô nghĩa trên tin nhắn cũ.
+  const noButtons = inlineKeyboard([])
+
   const { data: session } = await admin.from('hrm_qr_login_sessions').select('*').eq('id', sessionId).maybeSingle()
   if (!session) {
+    if (cq.message) await editMessageText(cq.message.chat.id, cq.message.message_id, '⌛ Phiên đăng nhập này đã hết hạn.', noButtons)
     await answerCallbackQuery(cq.id, 'Phiên đăng nhập này không còn tồn tại', true)
+    return
+  }
+
+  if (session.status === 'approved' || session.status === 'rejected') {
+    if (cq.message) {
+      await editMessageText(
+        cq.message.chat.id,
+        cq.message.message_id,
+        session.status === 'approved' ? '✅ Đã xác nhận đăng nhập.' : '❌ Đã từ chối đăng nhập.',
+        noButtons,
+      )
+    }
+    await answerCallbackQuery(cq.id, 'Yêu cầu này đã được xử lý rồi')
     return
   }
 
@@ -207,6 +227,7 @@ async function handleQrLoginCallback(cq: TelegramCallbackQuery) {
       cq.message.chat.id,
       cq.message.message_id,
       approve ? '✅ Đã xác nhận đăng nhập.' : '❌ Đã từ chối đăng nhập.',
+      noButtons,
     )
   }
   await answerCallbackQuery(cq.id, approve ? 'Đã xác nhận' : 'Đã từ chối')
@@ -277,6 +298,7 @@ async function handleLeaveRequestCallback(cq: TelegramCallbackQuery) {
       request.group_chat_id,
       request.bot_message_id,
       `Nhập giá trị mới cho "${fieldDef?.label ?? extra}" (nhắn thẳng vào nhóm này):`,
+      inlineKeyboard([]),
     )
     await answerCallbackQuery(cq.id)
     return
