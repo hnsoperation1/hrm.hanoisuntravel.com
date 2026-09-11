@@ -19,6 +19,7 @@ type TimesheetDay = {
 type Timesheet = {
   shift: { name: string; start_time: string; end_time: string } | null
   noShiftConfigured: boolean
+  isMisaAuthoritative: boolean
   days: TimesheetDay[]
   stats: { tongCongDays: number; otHours: number; lateEarlyCount: number; nghiDays: number }
 }
@@ -168,6 +169,12 @@ export default function BangCongPage() {
             {data.noShiftConfigured && (
               <p className="mb-4 rounded-xl bg-amber-50 p-2.5 text-xs text-amber-700">
                 Chưa cấu hình ca làm việc nào — số liệu đủ/thiếu công chỉ mang tính tham khảo.
+              </p>
+            )}
+            {data.isMisaAuthoritative && (
+              <p className="mb-4 rounded-xl bg-gray-50 p-2.5 text-xs text-gray-500">
+                Bảng công này lấy theo dữ liệu chấm công từ MISA — chấm công qua web/app chỉ để thử nghiệm, không tính
+                vào số liệu ở đây.
               </p>
             )}
             {data.shift && (

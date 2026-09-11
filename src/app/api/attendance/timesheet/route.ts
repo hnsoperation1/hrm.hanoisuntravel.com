@@ -52,11 +52,11 @@ export async function GET(req: NextRequest) {
   const startUtc = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0) - VN_OFFSET_MS)
   const endUtc = new Date(Date.UTC(year, month, 1, 0, 0, 0) - VN_OFFSET_MS)
 
-  const [{ data: reqRow }, { data: logs }, { data: approvedLeaves }] = await Promise.all([
-    supabase.from('hrm_employee_requirements').select('shift_id').eq('user_id', user!.id).maybeSingle(),
+  const [{ data: reqRow }, { data: rawLogs }, { data: approvedLeaves }] = await Promise.all([
+    supabase.from('hrm_employee_requirements').select('shift_id, misa_employee_code').eq('user_id', user!.id).maybeSingle(),
     supabase
       .from('hrm_attendance_logs')
-      .select('type, created_at')
+      .select('type, created_at, channel')
       .eq('user_id', user!.id)
       .eq('is_success', true)
       .gte('created_at', startUtc.toISOString())
@@ -64,6 +64,11 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: true }),
     supabase.from('hrm_leave_requests').select('fields').eq('requester_id', user!.id).eq('type', 'nghi_phep').eq('status', 'approved'),
   ])
+
+  // Nhân viên đã có mã MISA -> MISA là dữ liệu chuẩn cho Bảng công, chấm công
+  // qua web/app của người này chỉ để test, không tính vào công thật.
+  const isMisaAuthoritative = !!reqRow?.misa_employee_code
+  const logs = isMisaAuthoritative ? (rawLogs ?? []).filter((l) => l.channel === 'misa') : rawLogs
 
   let shift = reqRow?.shift_id
     ? (await supabase.from('hrm_shifts').select('*').eq('id', reqRow.shift_id).maybeSingle()).data
@@ -182,6 +187,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     shift: shift ? { name: shift.name, start_time: shift.start_time, end_time: shift.end_time } : null,
     noShiftConfigured,
+    isMisaAuthoritative,
     days,
     stats: {
       tongCongDays,
