@@ -237,6 +237,30 @@ export default function ChamCongPage() {
         </div>
       </div>
 
+      {/* 10 card lorem ipsum — tạm thời để test giao diện/cuộn trang, chưa
+          phải nội dung thật. */}
+      <div className="mt-6 space-y-4">
+        {[
+          'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+          'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
+          'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.',
+          'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+          'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium.',
+          'Totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt.',
+          'Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores.',
+          'Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit.',
+          'Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam.',
+          'Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur.',
+        ].map((text, i) => (
+          <div key={i} className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <h2 className="border-b border-gray-100 px-5 py-3 text-sm font-bold text-gray-700">Card {i + 1}</h2>
+            <div className="p-5">
+              <p className="text-sm text-gray-500">{text}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Modal chấm công thành công */}
       {showSuccessModal && lastResult?.isSuccess && (
         <div

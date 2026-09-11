@@ -33,6 +33,7 @@ export async function GET() {
       require_face: r?.require_face ?? true,
       location_id: r?.location_id ?? null,
       shift_id: r?.shift_id ?? null,
+      misa_employee_code: r?.misa_employee_code ?? null,
     }
   })
 
@@ -55,6 +56,9 @@ export async function POST(req: NextRequest) {
   if (typeof body.require_face === 'boolean') update.require_face = body.require_face
   if (body.location_id === null || typeof body.location_id === 'string') update.location_id = body.location_id
   if (body.shift_id === null || typeof body.shift_id === 'string') update.shift_id = body.shift_id
+  if (body.misa_employee_code === null || typeof body.misa_employee_code === 'string') {
+    update.misa_employee_code = body.misa_employee_code || null
+  }
 
   const { error } = await supabase.from('hrm_employee_requirements').upsert(update)
   if (error) return NextResponse.json({ error: 'Không lưu được cấu hình' }, { status: 500 })

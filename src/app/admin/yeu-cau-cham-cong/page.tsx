@@ -14,6 +14,7 @@ type Employee = {
   require_face: boolean
   location_id: string | null
   shift_id: string | null
+  misa_employee_code: string | null
 }
 
 type Location = { id: string; name: string }
@@ -33,6 +34,7 @@ export default function YeuCauChamCongPage() {
   const [faceData, setFaceData] = useState<Map<string, FaceEnrollment>>(new Map())
   const [expandedFaceId, setExpandedFaceId] = useState<string | null>(null)
   const [expandedVectorId, setExpandedVectorId] = useState<string | null>(null)
+  const [misaCodeInputs, setMisaCodeInputs] = useState<Record<string, string>>({})
   const [threshold, setThreshold] = useState<number | null>(null)
   const [thresholdInput, setThresholdInput] = useState('')
   const [savingThreshold, setSavingThreshold] = useState(false)
@@ -46,6 +48,9 @@ export default function YeuCauChamCongPage() {
       setEmployees(data.employees)
       setLocations(data.locations)
       setShifts(data.shifts)
+      setMisaCodeInputs(
+        Object.fromEntries(data.employees.map((e: Employee) => [e.id, e.misa_employee_code ?? ''])),
+      )
     }
     setLoading(false)
   }
@@ -113,6 +118,13 @@ export default function YeuCauChamCongPage() {
       // hiện sai trạng thái so với dữ liệu thật.
       load()
     }
+  }
+
+  async function saveMisaCode(emp: Employee) {
+    const value = misaCodeInputs[emp.id]?.trim() ?? ''
+    const code = value === '' ? null : value
+    if (code === emp.misa_employee_code) return
+    await saveField(emp, { misa_employee_code: code })
   }
 
   if (authLoading) return null
@@ -238,6 +250,14 @@ export default function YeuCauChamCongPage() {
                   </option>
                 ))}
               </select>
+
+              <input
+                value={misaCodeInputs[emp.id] ?? ''}
+                onChange={(e) => setMisaCodeInputs((prev) => ({ ...prev, [emp.id]: e.target.value }))}
+                onBlur={() => saveMisaCode(emp)}
+                placeholder="Mã nhân viên bên MISA AMIS Chấm công (nếu có)"
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 mt-2 focus:outline-none focus:ring-2 focus:ring-brand-400"
+              />
 
               {(() => {
                 const face = faceData.get(emp.id)

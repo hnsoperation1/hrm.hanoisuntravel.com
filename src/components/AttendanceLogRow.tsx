@@ -4,6 +4,7 @@ export type AttendanceLog = {
   id: string
   type: 'check_in' | 'check_out'
   created_at: string
+  channel: string
   is_within_radius: boolean
   is_ip_verified: boolean
   is_face_verified: boolean
@@ -51,11 +52,20 @@ export function LogRow({ log }: { log: AttendanceLog }) {
           <LogOut size={14} className="text-accent-500" />
         )}
         {log.type === 'check_in' ? 'Vào' : 'Ra'}
-        <span className={`flex items-center gap-0.5 text-xs ${log.is_within_radius ? 'text-green-600' : 'text-red-500'}`}>
-          <Wifi size={12} />
-          {log.distance_m != null ? `${Math.round(log.distance_m)}m` : '—'}
-        </span>
-        <ScanFace size={12} className={log.is_face_verified ? 'text-green-600' : 'text-red-500'} />
+        {log.channel === 'misa' ? (
+          // Chấm công thô kéo từ MISA (máy chấm công vật lý...) không đi qua
+          // pipeline xác thực GPS/mạng/khuôn mặt của iHNS — hiện rõ nguồn
+          // thay vì icon đỏ gây hiểu nhầm là xác thực thất bại.
+          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">MISA</span>
+        ) : (
+          <>
+            <span className={`flex items-center gap-0.5 text-xs ${log.is_within_radius ? 'text-green-600' : 'text-red-500'}`}>
+              <Wifi size={12} />
+              {log.distance_m != null ? `${Math.round(log.distance_m)}m` : '—'}
+            </span>
+            <ScanFace size={12} className={log.is_face_verified ? 'text-green-600' : 'text-red-500'} />
+          </>
+        )}
         {!log.is_success && <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">thất bại</span>}
       </span>
       <span className="text-gray-500">{formatTime(log.created_at)}</span>

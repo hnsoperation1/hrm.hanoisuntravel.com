@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const { data: logs, error } = await supabase
     .from('hrm_attendance_logs')
     .select(
-      'id, type, created_at, is_within_radius, is_ip_verified, is_face_verified, is_success, distance_m, face_distance, hrm_work_locations(name)',
+      'id, type, created_at, channel, is_within_radius, is_ip_verified, is_face_verified, is_success, distance_m, face_distance, hrm_work_locations(name)',
     )
     .eq('user_id', user!.id)
     // Chỉ lấy lượt chấm công THÀNH CÔNG — đây là màn xem lại lịch sử cho
