@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowDown, Loader2 } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 
 const PULL_THRESHOLD = 70 // px cần kéo xuống mới nhả tay là làm mới
 const MAX_PULL = 100 // càng kéo càng "nặng tay" (rubber-band), không cho kéo quá xa
@@ -72,18 +72,15 @@ export function PullToRefresh({ children, className }: { children: React.ReactNo
     <main ref={mainRef} className={`relative overscroll-y-contain ${className ?? ''}`}>
       {enabled && (
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-center overflow-hidden transition-[height]"
+          className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col items-center justify-center gap-1 overflow-hidden transition-[height]"
           style={{ height: pull, transitionDuration: startY.current === null ? '150ms' : '0ms' }}
         >
-          {refreshing ? (
-            <Loader2 size={18} className="animate-spin text-brand-500" />
-          ) : (
-            <ArrowDown
-              size={18}
-              className="text-gray-400 transition-transform"
-              style={{ transform: `rotate(${pull >= PULL_THRESHOLD ? 180 : 0}deg)` }}
-            />
-          )}
+          <RefreshCw
+            size={18}
+            className={`text-gray-400 ${refreshing ? 'animate-spin' : ''}`}
+            style={refreshing ? undefined : { transform: `rotate(${(pull / PULL_THRESHOLD) * 360}deg)` }}
+          />
+          <span className="text-[11px] font-medium text-gray-400">{refreshing ? 'Đang tải lại...' : 'Tải lại'}</span>
         </div>
       )}
       <div
