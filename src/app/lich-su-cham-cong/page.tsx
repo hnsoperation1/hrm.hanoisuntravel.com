@@ -63,7 +63,6 @@ export default function BangCongPage() {
   const [month, setMonth] = useState(today.getUTCMonth() + 1)
   const [data, setData] = useState<Timesheet | null>(null)
   const [tab, setTab] = useState<'grid' | 'list'>('grid')
-  const [showDetail, setShowDetail] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
 
@@ -241,17 +240,6 @@ export default function BangCongPage() {
               </div>
             ) : (
               <div>
-                <label className="mb-3 flex items-center justify-between text-sm text-gray-600">
-                  Hiển thị chi tiết giờ vào - ra
-                  <button
-                    type="button"
-                    onClick={() => setShowDetail((v) => !v)}
-                    className={`relative h-6 w-11 rounded-full transition-colors ${showDetail ? 'bg-green-500' : 'bg-gray-200'}`}
-                  >
-                    <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${showDetail ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                  </button>
-                </label>
-
                 {daysWithData.length === 0 ? (
                   <p className="py-10 text-center text-sm text-gray-400">Chưa có dữ liệu.</p>
                 ) : (
@@ -266,7 +254,7 @@ export default function BangCongPage() {
                             </span>
                             {d.status === 'nghi' ? 'Nghỉ phép' : 'Ca hành chính'}
                           </span>
-                          {showDetail && (d.checkIn || d.checkOut) && (
+                          {(d.checkIn || d.checkOut) && (
                             <span className="text-sm text-gray-500">
                               {d.checkIn ?? '--'} - {d.checkOut ?? '--'}
                             </span>
